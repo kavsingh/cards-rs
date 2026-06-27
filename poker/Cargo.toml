@@ -1,0 +1,10 @@
+[package]
+name = "poker"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["lib"]
+
+[dependencies]
+cards = { path = "../cards" }

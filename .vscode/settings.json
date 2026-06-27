@@ -1,0 +1,8 @@
+{
+	"rust-analyzer.check.command": "clippy",
+	"rust-analyzer.diagnostics.styleLints.enable": true,
+	"rust-analyzer.rustfmt.extraArgs": ["+nightly"],
+	"editor.defaultFormatter": "esbenp.prettier-vscode",
+	"[rust]": { "editor.defaultFormatter": "rust-lang.rust-analyzer" },
+	"[toml]": { "editor.defaultFormatter": "tombi-toml.tombi" }
+}

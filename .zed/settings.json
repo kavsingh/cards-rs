@@ -1,0 +1,20 @@
+{
+	"prettier": { "allowed": true },
+	"formatter": "prettier",
+	"format_on_save": "on",
+
+	"lsp": {
+		"rust-analyzer": {
+			"initialization_options": {
+				"check": { "command": "clippy" },
+				"diagnostics": { "styleLints": { "enable": true } },
+				"rustfmt": { "extraArgs": ["+nightly"] }
+			}
+		}
+	},
+
+	"languages": {
+		"Rust": { "formatter": "language_server" },
+		"TOML": { "formatter": "language_server" }
+	}
+}
