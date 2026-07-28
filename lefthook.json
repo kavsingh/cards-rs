@@ -11,9 +11,10 @@
 		]
 	},
 	"pre-push": {
+		"parallel": true,
 		"jobs": [
-			{ "glob": "*.rs", "run": "cargo +nightly fmt --all --check" },
-			{ "glob": "*.rs", "run": "cargo nextest run" }
+			{ "run": "cargo +nightly fmt --all --check" },
+			{ "run": "cargo nextest run" }
 		]
 	}
 }
