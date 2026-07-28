@@ -103,6 +103,6 @@ mod tests {
 
 		stack.sort();
 
-		assert_eq!(stack.map(|c| c.to_string()), ["3♥", "Q♦", "Q♣", "A♠"]);
+		assert_eq!(stack.map(|c| c.to_string()), ["3h", "Qd", "Qc", "As"]);
 	}
 }

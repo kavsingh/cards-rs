@@ -58,14 +58,14 @@ mod tests {
 		let deck = create_deck(Some(DeckOrder::NDO));
 
 		assert_eq!(deck.len(), 52);
-		assert_eq!(format!("{}", deck[0]), "A♠".to_string());
-		assert_eq!(format!("{}", deck[12]), "K♠".to_string());
-		assert_eq!(format!("{}", deck[13]), "A♥".to_string());
-		assert_eq!(format!("{}", deck[25]), "K♥".to_string());
-		assert_eq!(format!("{}", deck[26]), "K♣".to_string());
-		assert_eq!(format!("{}", deck[38]), "A♣".to_string());
-		assert_eq!(format!("{}", deck[39]), "K♦".to_string());
-		assert_eq!(format!("{}", deck[51]), "A♦".to_string());
+		assert_eq!(format!("{}", deck[0]), "As".to_string());
+		assert_eq!(format!("{}", deck[12]), "Ks".to_string());
+		assert_eq!(format!("{}", deck[13]), "Ah".to_string());
+		assert_eq!(format!("{}", deck[25]), "Kh".to_string());
+		assert_eq!(format!("{}", deck[26]), "Kc".to_string());
+		assert_eq!(format!("{}", deck[38]), "Ac".to_string());
+		assert_eq!(format!("{}", deck[39]), "Kd".to_string());
+		assert_eq!(format!("{}", deck[51]), "Ad".to_string());
 	}
 
 	#[test]
