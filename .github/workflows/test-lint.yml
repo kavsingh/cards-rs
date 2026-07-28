@@ -19,5 +19,5 @@ jobs:
                       rust+clippy
                       nextest
                       cargo-mutants
-            - run: cargo mutants --test-tool=nextest
+            - run: cargo mutants --in-place --test-tool=nextest
             - run: cargo clippy --all-targets --all-features -- -Dwarnings -Dclippy::all
