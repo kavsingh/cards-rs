@@ -1,0 +1,19 @@
+{
+	"$schema": "https://raw.githubusercontent.com/evilmartians/lefthook/refs/tags/v2.1.10/schema.json",
+	"min_version": "2.1.10",
+	"pre-commit": {
+		"jobs": [
+			{
+				"glob": "*.rs",
+				"run": "cargo +nightly fmt --all",
+				"stage_fixed": true
+			}
+		]
+	},
+	"pre-push": {
+		"jobs": [
+			{ "glob": "*.rs", "run": "cargo +nightly fmt --all --check" },
+			{ "glob": "*.rs", "run": "cargo nextest run" }
+		]
+	}
+}

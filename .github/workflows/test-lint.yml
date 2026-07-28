@@ -17,7 +17,9 @@ jobs:
               with:
                   tool: |
                       rust+clippy
+                      rust@nightly
                       nextest
                       cargo-mutants
             - run: cargo mutants --in-place --test-tool=nextest
             - run: cargo clippy --all-targets --all-features -- -Dwarnings -Dclippy::all
+            - run: cargo fmt --all --check
