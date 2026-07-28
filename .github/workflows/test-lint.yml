@@ -17,7 +17,7 @@ jobs:
               with:
                   tool: |
                       rust+clippy
-                      rust@nightly
+                      rust@nightly+rustfmt
                       nextest
                       cargo-mutants
             - run: cargo mutants --in-place --test-tool=nextest
