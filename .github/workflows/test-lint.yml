@@ -20,6 +20,6 @@ jobs:
                       rust@nightly+rustfmt
                       nextest
                       cargo-mutants
-            - run: cargo mutants --in-place --test-tool=nextest
-            - run: cargo clippy --all-targets --all-features -- -Dwarnings -Dclippy::all
             - run: cargo +nightly fmt --all --check
+            - run: cargo clippy --all-targets --all-features -- -Dwarnings -Dclippy::all
+            - run: cargo mutants --in-place --test-tool=nextest
