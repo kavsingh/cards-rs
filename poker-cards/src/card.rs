@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display};
 use std::ops::{Deref, DerefMut};
+use std::str::FromStr;
 
 const ORDERED_RANKS: [cards::Rank; 13] = [
 	cards::Rank::Two,
@@ -18,7 +19,7 @@ const ORDERED_RANKS: [cards::Rank; 13] = [
 	cards::Rank::Ace,
 ];
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Card(cards::Card);
 
 impl Card {
@@ -58,12 +59,6 @@ impl Display for Card {
 	}
 }
 
-impl Debug for Card {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.0)
-	}
-}
-
 impl Ord for Card {
 	fn cmp(&self, other: &Self) -> Ordering {
 		if self.rank == other.rank {
@@ -77,6 +72,16 @@ impl Ord for Card {
 impl PartialOrd for Card {
 	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
 		Some(self.cmp(other))
+	}
+}
+
+impl FromStr for Card {
+	type Err = String;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		let card = cards::Card::from_str(s)?;
+
+		Ok(Self(card))
 	}
 }
 
@@ -94,15 +99,19 @@ mod tests {
 			std::cmp::Ordering::Equal
 		);
 
-		let mut stack = [
-			Card::new(Rank::Three, Suit::Hearts),
-			Card::new(Rank::Queen, Suit::Diamonds),
-			Card::new(Rank::Ace, Suit::Spades),
-			Card::new(Rank::Queen, Suit::Clubs),
-		];
+		let unsorted = ["Qd", "3h", "As", "Qc"];
+		let sorted = ["3h", "Qd", "Qc", "As"];
+
+		let mut stack = unsorted
+			.iter()
+			.map(|s| s.parse().unwrap())
+			.collect::<Vec<Card>>();
 
 		stack.sort();
 
-		assert_eq!(stack.map(|c| c.to_string()), ["3h", "Qd", "Qc", "As"]);
+		assert_eq!(
+			stack.iter().map(|c| c.to_string()).collect::<Vec<_>>(),
+			sorted
+		);
 	}
 }

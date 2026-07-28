@@ -1,6 +1,0 @@
-{
-	"useTabs": true,
-	"overrides": [
-		{ "files": ["*.json", "*.jsonc"], "options": { "trailingComma": "none" } }
-	]
-}

@@ -1,8 +1,11 @@
 {
-	"prettier": { "allowed": true },
-	"formatter": "prettier",
 	"format_on_save": "on",
-
+	"formatter": "prettier",
+	"prettier": { "allowed": true },
+	"languages": {
+		"Rust": { "formatter": "language_server" },
+		"TOML": { "formatter": "language_server" }
+	},
 	"lsp": {
 		"rust-analyzer": {
 			"initialization_options": {
@@ -11,10 +14,5 @@
 				"rustfmt": { "extraArgs": ["+nightly"] }
 			}
 		}
-	},
-
-	"languages": {
-		"Rust": { "formatter": "language_server" },
-		"TOML": { "formatter": "language_server" }
 	}
 }

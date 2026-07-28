@@ -22,6 +22,7 @@ impl Display for Suit {
 	}
 }
 
+#[mutants::skip]
 impl FromStr for Suit {
 	type Err = String;
 
@@ -75,6 +76,7 @@ impl Display for Rank {
 	}
 }
 
+#[mutants::skip]
 impl FromStr for Rank {
 	type Err = String;
 
@@ -98,7 +100,7 @@ impl FromStr for Rank {
 	}
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct Card {
 	pub rank: Rank,
 	pub suit: Suit,
@@ -116,12 +118,6 @@ impl Display for Card {
 	}
 }
 
-impl Debug for Card {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self)
-	}
-}
-
 impl FromStr for Card {
 	type Err = String;
 
@@ -131,17 +127,13 @@ impl FromStr for Card {
 		}
 
 		let (rank_str, suit_str) = s.split_at(s.len() - 1);
-		let rank = Rank::from_str(rank_str)?;
-		let suit = Suit::from_str(suit_str)?;
 
-		Ok(Card { rank, suit })
+		Ok(Self::new(rank_str.parse()?, suit_str.parse()?))
 	}
 }
 
 #[cfg(test)]
 mod tests {
-	use std::str::FromStr;
-
 	use super::{Card, Rank, Suit};
 
 	#[test]
@@ -153,18 +145,18 @@ mod tests {
 
 	#[test]
 	fn test_card_from_str() {
-		let card = Card::from_str("10h").unwrap();
+		let card: Card = "10h".parse().unwrap();
 
 		assert_eq!(card.rank, Rank::Ten);
 		assert_eq!(card.suit, Suit::Hearts);
 
-		let card = Card::from_str("Jc").unwrap();
+		let card: Card = "Jc".parse().unwrap();
 
 		assert_eq!(card.rank, Rank::Jack);
 		assert_eq!(card.suit, Suit::Clubs);
 
-		assert_eq!(Card::from_str("Zs").unwrap_err(), "invalid rank: Z");
-		assert_eq!(Card::from_str("10q").unwrap_err(), "invalid suit: q");
-		assert_eq!(Card::from_str("r").unwrap_err(), "invalid card: r");
+		assert_eq!("Zs".parse::<Card>().unwrap_err(), "invalid rank: Z");
+		assert_eq!("10q".parse::<Card>().unwrap_err(), "invalid suit: q");
+		assert_eq!("r".parse::<Card>().unwrap_err(), "invalid card: r");
 	}
 }

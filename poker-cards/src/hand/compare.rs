@@ -11,8 +11,24 @@ pub fn highest_rank_then_kicker(a: &Hand, b: &Hand) -> Ordering {
 }
 
 fn is_ace_low_straight(cards: &[Card]) -> bool {
-	cards.iter().any(|c| c.rank == Rank::Ace)
-		&& cards.iter().any(|c| c.rank == Rank::Two)
+	let mut has_ace = false;
+	let mut has_two = false;
+
+	for card in cards.iter() {
+		if card.rank == Rank::Two {
+			has_two = true;
+		}
+
+		if card.rank == Rank::Ace {
+			has_ace = true;
+		}
+
+		if has_ace && has_two {
+			return true;
+		}
+	}
+
+	false
 }
 
 // for straights, we need to take into account ace low - ace is naturally high
@@ -21,7 +37,6 @@ pub fn straight(a: &Hand, b: &Hand) -> Ordering {
 		is_ace_low_straight(&a.rank_cards),
 		is_ace_low_straight(&b.rank_cards),
 	) {
-		(true, true) => Ordering::Equal,
 		(true, false) => Ordering::Less,
 		(false, true) => Ordering::Greater,
 		_ => highest_rank_then_kicker(a, b),
@@ -45,6 +60,7 @@ pub fn two_pair(a: &Hand, b: &Hand) -> Ordering {
 
 	for (a_pair, b_pair) in a_pairs.iter().zip(b_pairs.iter()) {
 		let cmp = cmp_max(a_pair, b_pair);
+
 		if cmp != Ordering::Equal {
 			return cmp;
 		}

@@ -35,7 +35,6 @@ pub struct Hand {
 impl Ord for Hand {
 	fn cmp(&self, other: &Self) -> Ordering {
 		self.rank.cmp(&other.rank).then_with(|| match self.rank {
-			HandRank::RoyalFlush => Ordering::Equal,
 			HandRank::TwoPair => two_pair(self, other),
 			HandRank::Straight | HandRank::StraightFlush => {
 				straight(self, other)
@@ -734,11 +733,11 @@ mod tests {
 		let straight_no_ace = Hand {
 			rank: HandRank::Straight,
 			rank_cards: vec![
-				Card::new(Rank::Seven, Suit::Diamonds),
-				Card::new(Rank::Six, Suit::Diamonds),
+				Card::new(Rank::Six, Suit::Hearts),
 				Card::new(Rank::Five, Suit::Diamonds),
-				Card::new(Rank::Four, Suit::Diamonds),
+				Card::new(Rank::Four, Suit::Clubs),
 				Card::new(Rank::Three, Suit::Diamonds),
+				Card::new(Rank::Two, Suit::Spades),
 			],
 			kicker_cards: vec![],
 		};
@@ -747,9 +746,9 @@ mod tests {
 			rank: HandRank::Straight,
 			rank_cards: vec![
 				Card::new(Rank::Five, Suit::Diamonds),
-				Card::new(Rank::Four, Suit::Diamonds),
+				Card::new(Rank::Four, Suit::Clubs),
 				Card::new(Rank::Three, Suit::Diamonds),
-				Card::new(Rank::Two, Suit::Diamonds),
+				Card::new(Rank::Two, Suit::Hearts),
 				Card::new(Rank::Ace, Suit::Diamonds),
 			],
 			kicker_cards: vec![],
@@ -757,6 +756,30 @@ mod tests {
 
 		let straight_ace_high = Hand {
 			rank: HandRank::Straight,
+			rank_cards: vec![
+				Card::new(Rank::Ace, Suit::Diamonds),
+				Card::new(Rank::King, Suit::Clubs),
+				Card::new(Rank::Queen, Suit::Hearts),
+				Card::new(Rank::Jack, Suit::Diamonds),
+				Card::new(Rank::Ten, Suit::Spades),
+			],
+			kicker_cards: vec![],
+		};
+
+		let royal_flush_clubs = Hand {
+			rank: HandRank::RoyalFlush,
+			rank_cards: vec![
+				Card::new(Rank::Ace, Suit::Clubs),
+				Card::new(Rank::King, Suit::Clubs),
+				Card::new(Rank::Queen, Suit::Clubs),
+				Card::new(Rank::Jack, Suit::Clubs),
+				Card::new(Rank::Ten, Suit::Clubs),
+			],
+			kicker_cards: vec![],
+		};
+
+		let royal_flush_diamonds = Hand {
+			rank: HandRank::RoyalFlush,
 			rank_cards: vec![
 				Card::new(Rank::Ace, Suit::Diamonds),
 				Card::new(Rank::King, Suit::Diamonds),
@@ -768,9 +791,11 @@ mod tests {
 		};
 
 		let mut hands = [
+			&royal_flush_diamonds,
 			&flush,
 			&straight_ace_high,
 			&two_pair_jack_sixes,
+			&royal_flush_clubs,
 			&straight_ace_low,
 			&high_card,
 			&two_pair_jack_fives,
@@ -787,9 +812,11 @@ mod tests {
 				&straight_ace_low,
 				&straight_no_ace,
 				&straight_ace_high,
-				&flush
+				&flush,
+				&royal_flush_diamonds,
+				&royal_flush_clubs,
 			],
 			hands,
-		)
+		);
 	}
 }
