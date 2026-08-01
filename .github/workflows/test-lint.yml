@@ -20,6 +20,8 @@ jobs:
                       rust@nightly+rustfmt
                       nextest
                       cargo-mutants
+                      cargo-llvm-cov
             - run: cargo +nightly fmt --all --check
             - run: cargo clippy --all-targets --all-features -- -Dwarnings -Dclippy::all
+            - run: cargo llvm-cov nextest run --all-targets --all-features --no-fail-fast
             - run: cargo mutants --in-place --test-tool=nextest
