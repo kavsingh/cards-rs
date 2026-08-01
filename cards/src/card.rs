@@ -12,10 +12,10 @@ pub enum Suit {
 impl Display for Suit {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		let display = match self {
-			Suit::Diamonds => "d",
-			Suit::Clubs => "c",
-			Suit::Hearts => "h",
-			Suit::Spades => "s",
+			Self::Diamonds => "d",
+			Self::Clubs => "c",
+			Self::Hearts => "h",
+			Self::Spades => "s",
 		};
 
 		f.write_str(display)
@@ -28,11 +28,11 @@ impl FromStr for Suit {
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		match s {
-			"d" => Ok(Suit::Diamonds),
-			"c" => Ok(Suit::Clubs),
-			"h" => Ok(Suit::Hearts),
-			"s" => Ok(Suit::Spades),
-			_ => Err(format!("invalid suit: {}", s)),
+			"d" => Ok(Self::Diamonds),
+			"c" => Ok(Self::Clubs),
+			"h" => Ok(Self::Hearts),
+			"s" => Ok(Self::Spades),
+			_ => Err(format!("invalid suit: {s}")),
 		}
 	}
 }
@@ -57,19 +57,19 @@ pub enum Rank {
 impl Display for Rank {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		let display = match self {
-			Rank::Two => "2",
-			Rank::Three => "3",
-			Rank::Four => "4",
-			Rank::Five => "5",
-			Rank::Six => "6",
-			Rank::Seven => "7",
-			Rank::Eight => "8",
-			Rank::Nine => "9",
-			Rank::Ten => "10",
-			Rank::Jack => "J",
-			Rank::Queen => "Q",
-			Rank::King => "K",
-			Rank::Ace => "A",
+			Self::Two => "2",
+			Self::Three => "3",
+			Self::Four => "4",
+			Self::Five => "5",
+			Self::Six => "6",
+			Self::Seven => "7",
+			Self::Eight => "8",
+			Self::Nine => "9",
+			Self::Ten => "10",
+			Self::Jack => "J",
+			Self::Queen => "Q",
+			Self::King => "K",
+			Self::Ace => "A",
 		};
 
 		f.write_str(display)
@@ -82,20 +82,20 @@ impl FromStr for Rank {
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		match s {
-			"2" => Ok(Rank::Two),
-			"3" => Ok(Rank::Three),
-			"4" => Ok(Rank::Four),
-			"5" => Ok(Rank::Five),
-			"6" => Ok(Rank::Six),
-			"7" => Ok(Rank::Seven),
-			"8" => Ok(Rank::Eight),
-			"9" => Ok(Rank::Nine),
-			"10" => Ok(Rank::Ten),
-			"J" => Ok(Rank::Jack),
-			"Q" => Ok(Rank::Queen),
-			"K" => Ok(Rank::King),
-			"A" => Ok(Rank::Ace),
-			_ => Err(format!("invalid rank: {}", s)),
+			"2" => Ok(Self::Two),
+			"3" => Ok(Self::Three),
+			"4" => Ok(Self::Four),
+			"5" => Ok(Self::Five),
+			"6" => Ok(Self::Six),
+			"7" => Ok(Self::Seven),
+			"8" => Ok(Self::Eight),
+			"9" => Ok(Self::Nine),
+			"10" => Ok(Self::Ten),
+			"J" => Ok(Self::Jack),
+			"Q" => Ok(Self::Queen),
+			"K" => Ok(Self::King),
+			"A" => Ok(Self::Ace),
+			_ => Err(format!("invalid rank: {s}")),
 		}
 	}
 }
@@ -107,8 +107,9 @@ pub struct Card {
 }
 
 impl Card {
-	pub fn new(rank: Rank, suit: Suit) -> Self {
-		Card { rank, suit }
+	#[must_use]
+	pub const fn new(rank: Rank, suit: Suit) -> Self {
+		Self { rank, suit }
 	}
 }
 
@@ -122,11 +123,11 @@ impl FromStr for Card {
 	type Err = String;
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		if s.len() < 2 {
-			return Err(format!("invalid card: {}", s));
-		}
+		let (rank_str, suit_str) = s.split_at(s.len().saturating_sub(1));
 
-		let (rank_str, suit_str) = s.split_at(s.len() - 1);
+		if rank_str.is_empty() || suit_str.is_empty() {
+			return Err(format!("invalid card: {s}"));
+		}
 
 		Ok(Self::new(rank_str.parse()?, suit_str.parse()?))
 	}
@@ -140,10 +141,11 @@ mod tests {
 	fn test_card_display() {
 		let card = Card::new(Rank::Ace, Suit::Spades);
 
-		assert_eq!(format!("{}", card), "As");
+		assert_eq!(format!("{card}"), "As");
 	}
 
 	#[test]
+	#[allow(clippy::unwrap_used)]
 	fn test_card_from_str() {
 		let card: Card = "10h".parse().unwrap();
 

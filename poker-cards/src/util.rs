@@ -39,7 +39,7 @@ pub fn chunk_by<TItem: Copy>(
 		if let Some(last_chunk) = chunks.last_mut() {
 			match last_chunk.last() {
 				Some(last_item) if predicate_fn(last_item, item) => {
-					last_chunk.push(*item)
+					last_chunk.push(*item);
 				}
 				_ => chunks.push(vec![*item]),
 			}

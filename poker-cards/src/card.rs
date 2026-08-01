@@ -23,10 +23,12 @@ const ORDERED_RANKS: [cards::Rank; 13] = [
 pub struct Card(cards::Card);
 
 impl Card {
-	pub fn new(rank: cards::Rank, suit: cards::Suit) -> Self {
+	#[must_use]
+	pub const fn new(rank: cards::Rank, suit: cards::Suit) -> Self {
 		Self(cards::Card::new(rank, suit))
 	}
 
+	#[must_use]
 	pub fn rank_value(&self) -> usize {
 		ORDERED_RANKS
 			.iter()
@@ -34,8 +36,13 @@ impl Card {
 			.unwrap_or_default()
 	}
 
+	#[must_use]
 	pub fn rank_diff(&self, other: &Self) -> isize {
-		self.rank_value() as isize - other.rank_value() as isize
+		let self_rank = isize::try_from(self.rank_value()).unwrap_or_default();
+		let other_rank =
+			isize::try_from(other.rank_value()).unwrap_or_default();
+
+		self_rank.saturating_sub(other_rank)
 	}
 }
 
@@ -92,6 +99,7 @@ mod tests {
 	use super::Card;
 
 	#[test]
+	#[allow(clippy::unwrap_used)]
 	fn should_order_cards_on_rank() {
 		assert_eq!(
 			Card::new(Rank::Two, Suit::Hearts)
@@ -110,7 +118,7 @@ mod tests {
 		stack.sort();
 
 		assert_eq!(
-			stack.iter().map(|c| c.to_string()).collect::<Vec<_>>(),
+			stack.iter().map(Card::to_string).collect::<Vec<_>>(),
 			sorted
 		);
 	}

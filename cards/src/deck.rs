@@ -1,10 +1,11 @@
 use crate::card::{Card, Rank, Suit};
 
 pub enum DeckOrder {
-	/// New-deck order (NDO) - see https://en.wikipedia.org/wiki/Standard_52-card_deck#New-deck_order_(NDO)
+	/// New-deck order (NDO) - see [here](https://en.wikipedia.org/wiki/Standard_52-card_deck#New-deck_order_(NDO))
 	NDO,
 }
 
+#[must_use]
 pub fn create_deck(order: Option<DeckOrder>) -> Vec<Card> {
 	match order.unwrap_or(DeckOrder::NDO) {
 		DeckOrder::NDO => create_ndo_deck(),
@@ -41,7 +42,7 @@ fn create_ndo_deck() -> Vec<Card> {
 			let mut ranks = NDO_RANK_ORDER;
 
 			if *reverse {
-				ranks.reverse()
+				ranks.reverse();
 			}
 
 			ranks.map(|rank| Card::new(rank, *suit))
@@ -54,6 +55,7 @@ mod tests {
 	use super::{DeckOrder, create_deck};
 
 	#[test]
+	#[allow(clippy::indexing_slicing)]
 	fn should_create_ndo_deck() {
 		let deck = create_deck(Some(DeckOrder::NDO));
 
@@ -76,10 +78,7 @@ mod tests {
 		for (default_card, specified_card) in
 			default_deck.iter().zip(specified_deck.iter())
 		{
-			assert_eq!(
-				format!("{}", default_card),
-				format!("{}", specified_card)
-			);
+			assert_eq!(format!("{default_card}"), format!("{specified_card}"));
 		}
 	}
 }

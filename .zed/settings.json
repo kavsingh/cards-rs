@@ -4,7 +4,10 @@
 	"prettier": { "allowed": true },
 	"languages": {
 		"Rust": { "formatter": "language_server" },
-		"TOML": { "formatter": "language_server" }
+		"TOML": {
+			"language_servers": ["tombi"],
+			"formatter": { "language_server": { "name": "tombi" } }
+		}
 	},
 	"lsp": {
 		"rust-analyzer": {

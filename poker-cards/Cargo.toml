@@ -8,3 +8,6 @@ crate-type = ["lib"]
 
 [dependencies]
 cards = { path = "../cards" }
+
+[lints]
+workspace = true

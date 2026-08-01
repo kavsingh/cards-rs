@@ -14,7 +14,7 @@ fn is_ace_low_straight(cards: &[Card]) -> bool {
 	let mut has_ace = false;
 	let mut has_two = false;
 
-	for card in cards.iter() {
+	for card in cards {
 		if card.rank == Rank::Two {
 			has_two = true;
 		}

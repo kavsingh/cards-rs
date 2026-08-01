@@ -1,10 +1,12 @@
 use crate::util::{chunk_by, group_by, without};
 use crate::{Card, Hand, HandRank, Rank};
 
+const MAX_KICKER_CARDS: usize = 5;
+
 fn to_hand(rank: HandRank, rank_cards: Vec<Card>, sorted: &[Card]) -> Hand {
 	let kicker_cards = without(&rank_cards, sorted)
 		.into_iter()
-		.take(5 - rank_cards.len())
+		.take(MAX_KICKER_CARDS.saturating_sub(rank_cards.len()))
 		.collect();
 
 	Hand {
@@ -55,9 +57,7 @@ fn extract_four_of_a_kind(sorted: &[Card]) -> Option<Hand> {
 	group_by(sorted, |c| c.rank)
 		.iter()
 		.find(|(_, cards)| cards.len() == 4)
-		.map(|(_, cards)| {
-			to_hand(HandRank::FourOfAKind, cards.to_vec(), sorted)
-		})
+		.map(|(_, cards)| to_hand(HandRank::FourOfAKind, cards.clone(), sorted))
 }
 
 fn extract_full_house(sorted: &[Card]) -> Option<Hand> {
@@ -108,7 +108,7 @@ fn extract_straight(sorted: &[Card]) -> Option<Hand> {
 			.collect::<Vec<_>>();
 
 		return Some(to_hand(HandRank::Straight, straight, sorted));
-	};
+	}
 
 	None
 }
@@ -118,7 +118,7 @@ fn extract_three_of_a_kind(sorted: &[Card]) -> Option<Hand> {
 		.iter()
 		.find(|(_, cards)| cards.len() == 3)
 		.map(|(_, cards)| {
-			to_hand(HandRank::ThreeOfAKind, cards.to_vec(), sorted)
+			to_hand(HandRank::ThreeOfAKind, cards.clone(), sorted)
 		})
 }
 

@@ -65,22 +65,19 @@ impl From<HandCandidate<'_>> for Hand {
 			return hand;
 		}
 
-		// since pocket cards are required to be a 2 card array, we can
-		// be sure that sorted has at least 2 cards
-		let highest_card = sorted[0];
-
-		Hand {
+		Self {
 			rank: HandRank::HighCard,
-			rank_cards: vec![highest_card],
-			kicker_cards: sorted[1..5].to_vec(),
+			rank_cards: sorted.first().map(|c| vec![*c]).unwrap_or_default(),
+			kicker_cards: sorted
+				.get(1..5)
+				.map(std::borrow::ToOwned::to_owned)
+				.unwrap_or_default(),
 		}
 	}
 }
 
 #[cfg(test)]
 mod tests {
-	use std::vec;
-
 	use super::{Hand, HandCandidate, HandRank};
 	use crate::{Card, Rank, Suit};
 
@@ -684,6 +681,7 @@ mod tests {
 	}
 
 	#[test]
+	#[allow(clippy::too_many_lines)]
 	fn should_compare_hands() {
 		let two_pair_jack_sixes = Hand {
 			rank: HandRank::TwoPair,
