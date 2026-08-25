@@ -3,6 +3,8 @@ use std::fmt::{Debug, Display};
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
+use thiserror::Error;
+
 const ORDERED_RANKS: [cards::Rank; 13] = [
 	cards::Rank::Two,
 	cards::Rank::Three,
@@ -18,6 +20,12 @@ const ORDERED_RANKS: [cards::Rank; 13] = [
 	cards::Rank::King,
 	cards::Rank::Ace,
 ];
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum CardError {
+	#[error("parse error")]
+	ParseError(#[from] cards::CardParseError),
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Card(cards::Card);
@@ -83,7 +91,7 @@ impl PartialOrd for Card {
 }
 
 impl FromStr for Card {
-	type Err = String;
+	type Err = CardError;
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		let card = cards::Card::from_str(s)?;

@@ -7,7 +7,8 @@ edition.workspace = true
 crate-type = ["lib"]
 
 [dependencies]
-cards = { path = "../cards" }
+cards.path = "../cards"
+thiserror.workspace = true
 
 [lints]
 workspace = true

@@ -1,6 +1,18 @@
 use std::fmt::{Debug, Display};
 use std::str::FromStr;
 
+use thiserror::Error;
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum CardParseError {
+	#[error("invalid rank: {0}")]
+	InvalidRank(String),
+	#[error("invalid suit: {0}")]
+	InvalidSuit(String),
+	#[error("invalid card: {0}")]
+	InvalidCard(String),
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Suit {
 	Diamonds,
@@ -24,7 +36,7 @@ impl Display for Suit {
 
 #[mutants::skip]
 impl FromStr for Suit {
-	type Err = String;
+	type Err = CardParseError;
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		match s {
@@ -32,7 +44,7 @@ impl FromStr for Suit {
 			"c" => Ok(Self::Clubs),
 			"h" => Ok(Self::Hearts),
 			"s" => Ok(Self::Spades),
-			_ => Err(format!("invalid suit: {s}")),
+			_ => Err(CardParseError::InvalidSuit(s.to_string())),
 		}
 	}
 }
@@ -78,7 +90,7 @@ impl Display for Rank {
 
 #[mutants::skip]
 impl FromStr for Rank {
-	type Err = String;
+	type Err = CardParseError;
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		match s {
@@ -95,7 +107,7 @@ impl FromStr for Rank {
 			"Q" => Ok(Self::Queen),
 			"K" => Ok(Self::King),
 			"A" => Ok(Self::Ace),
-			_ => Err(format!("invalid rank: {s}")),
+			_ => Err(CardParseError::InvalidRank(s.to_string())),
 		}
 	}
 }
@@ -120,13 +132,13 @@ impl Display for Card {
 }
 
 impl FromStr for Card {
-	type Err = String;
+	type Err = CardParseError;
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		let (rank_str, suit_str) = s.split_at(s.len().saturating_sub(1));
 
 		if rank_str.is_empty() || suit_str.is_empty() {
-			return Err(format!("invalid card: {s}"));
+			return Err(CardParseError::InvalidCard(s.to_string()));
 		}
 
 		Ok(Self::new(rank_str.parse()?, suit_str.parse()?))
@@ -135,7 +147,7 @@ impl FromStr for Card {
 
 #[cfg(test)]
 mod tests {
-	use super::{Card, Rank, Suit};
+	use super::{Card, CardParseError, Rank, Suit};
 
 	#[test]
 	fn test_card_display() {
@@ -157,8 +169,17 @@ mod tests {
 		assert_eq!(card.rank, Rank::Jack);
 		assert_eq!(card.suit, Suit::Clubs);
 
-		assert_eq!("Zs".parse::<Card>().unwrap_err(), "invalid rank: Z");
-		assert_eq!("10q".parse::<Card>().unwrap_err(), "invalid suit: q");
-		assert_eq!("r".parse::<Card>().unwrap_err(), "invalid card: r");
+		assert_eq!(
+			"Zs".parse::<Card>().unwrap_err(),
+			CardParseError::InvalidRank("Z".to_string())
+		);
+		assert_eq!(
+			"10q".parse::<Card>().unwrap_err(),
+			CardParseError::InvalidSuit("q".to_string())
+		);
+		assert_eq!(
+			"r".parse::<Card>().unwrap_err(),
+			CardParseError::InvalidCard("r".to_string())
+		);
 	}
 }
