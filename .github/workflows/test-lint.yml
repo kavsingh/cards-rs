@@ -16,12 +16,11 @@ jobs:
             - uses: taiki-e/install-action@v2
               with:
                   tool: |
-                      rust+clippy
-                      rust@nightly+rustfmt
+                      rust@nightly+rustfmt+clippy
                       nextest
                       cargo-mutants
                       cargo-llvm-cov
-            - run: cargo +nightly fmt --all --check
+            - run: cargo fmt --all --check
             - run: cargo clippy --all-targets --all-features -- -Dwarnings -Dclippy::all
             - run: cargo llvm-cov nextest --all-targets --all-features --no-fail-fast
             - run: cargo mutants --in-place --test-tool=nextest
