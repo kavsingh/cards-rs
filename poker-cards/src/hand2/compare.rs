@@ -1,5 +1,6 @@
-use super::{Hand, HighCard, Pair, Straight, ThreeOfAKind, TwoPair};
-use crate::hand2::Flush;
+use super::{
+	Flush, FullHouse, Hand, HighCard, Pair, Straight, ThreeOfAKind, TwoPair,
+};
 use crate::util::cmp_max;
 use crate::{Card, Rank};
 
@@ -151,6 +152,29 @@ impl Eq for Flush {}
 
 //
 
+impl Ord for FullHouse {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		cmp_max(&self.triplet, &other.triplet)
+			.then_with(|| cmp_max(&self.pair, &other.pair))
+	}
+}
+
+impl PartialOrd for FullHouse {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl PartialEq for FullHouse {
+	fn eq(&self, other: &Self) -> bool {
+		self.cmp(other).is_eq()
+	}
+}
+
+impl Eq for FullHouse {}
+
+//
+
 trait RankedHand {
 	fn rank(&self) -> u8;
 }
@@ -182,6 +206,8 @@ impl Ord for Hand {
 				(Self::TwoPair(a), Self::TwoPair(b)) => a.cmp(b),
 				(Self::ThreeOfAKind(a), Self::ThreeOfAKind(b)) => a.cmp(b),
 				(Self::Straight(a), Self::Straight(b)) => a.cmp(b),
+				(Self::Flush(a), Self::Flush(b)) => a.cmp(b),
+				(Self::FullHouse(a), Self::FullHouse(b)) => a.cmp(b),
 				_ => std::cmp::Ordering::Equal,
 			})
 	}
@@ -249,17 +275,40 @@ mod tests {
 			straight: [c("Ad"), c("Kc"), c("Qh"), c("Jd"), c("10s")],
 		});
 
-		let flush = Hand::Flush(super::Flush {
-			flush: [c("Ad"), c("Kd"), c("Qd"), c("Jd"), c("10d")],
+		let flush_king_high = Hand::Flush(super::Flush {
+			flush: [c("Kd"), c("Qd"), c("8d"), c("7d"), c("4d")],
+		});
+
+		let flush_seven_high = Hand::Flush(super::Flush {
+			flush: [c("7s"), c("6s"), c("5s"), c("3s"), c("2s")],
+		});
+
+		let full_house_ace_king = Hand::FullHouse(super::FullHouse {
+			triplet: [c("Ad"), c("Ac"), c("Ah")],
+			pair: [c("Kd"), c("Kc")],
+		});
+
+		let full_house_ace_6 = Hand::FullHouse(super::FullHouse {
+			triplet: [c("Ad"), c("Ac"), c("Ah")],
+			pair: [c("6d"), c("6c")],
+		});
+
+		let full_house_10_3 = Hand::FullHouse(super::FullHouse {
+			triplet: [c("10d"), c("10c"), c("10h")],
+			pair: [c("3d"), c("3c")],
 		});
 
 		let mut hands = [
 			&straight_ace_high,
 			&two_pair_jack_sixes,
+			&flush_seven_high,
+			&full_house_ace_king,
 			&straight_ace_low,
+			&full_house_10_3,
 			&high_king_10_kicker,
+			&full_house_ace_6,
 			&two_pair_jack_fives,
-			&flush,
+			&flush_king_high,
 			&straight_no_ace,
 			&high_king_6_kicker,
 		];
@@ -275,7 +324,11 @@ mod tests {
 				&straight_ace_low,
 				&straight_no_ace,
 				&straight_ace_high,
-				&flush
+				&flush_seven_high,
+				&flush_king_high,
+				&full_house_10_3,
+				&full_house_ace_6,
+				&full_house_ace_king,
 			],
 			hands,
 		);
