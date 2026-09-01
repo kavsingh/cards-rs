@@ -41,99 +41,25 @@ fn kickers_from(cards: &[Card], exclude: &[Card]) -> Vec<Card> {
 		.collect()
 }
 
-impl TryFrom<&HandCandidate> for HighCard {
-	type Error = ExtractError;
-
-	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		let high_card = candidate
-			.sorted_cards
-			.first()
-			.ok_or(Self::Error::NotEnoughCards)?;
-		let kicker_cards = candidate
-			.sorted_cards
-			.get(1..5)
-			.unwrap_or_default()
-			.to_vec();
-
-		Ok(Self {
-			high_card: high_card.to_owned(),
-			kickers: kicker_cards,
-		})
-	}
-}
-
 fn try_pair_from(sorted_cards: &[Card]) -> Result<[Card; 2], ExtractError> {
-	let grouped = group_by(sorted_cards, |c| c.rank);
-	let pair = grouped.iter().find(|(_, cards)| cards.len() >= 2);
-
-	match pair.map(|(_, p)| &p[..]) {
+	match group_by(sorted_cards, |c| c.rank)
+		.iter()
+		.find(|(_, cards)| cards.len() >= 2)
+		.map(|(_, p)| &p[..])
+	{
 		Some([a, b, ..]) => Ok([*a, *b]),
 		_ => Err(ExtractError::NoPair),
 	}
 }
 
-impl TryFrom<&HandCandidate> for Pair {
-	type Error = ExtractError;
-
-	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		let pair = try_pair_from(&candidate.sorted_cards)?;
-
-		Ok(Self {
-			pair,
-			kickers: kickers_from(&candidate.sorted_cards, &pair),
-		})
-	}
-}
-
-impl TryFrom<&HandCandidate> for TwoPair {
-	type Error = ExtractError;
-
-	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		let grouped = group_by(&candidate.sorted_cards, |c| c.rank);
-		let pairs = grouped
-			.iter()
-			.filter(|(_, cards)| cards.len() == 2)
-			.collect::<Vec<_>>();
-
-		let (high_pair, low_pair) = match (
-			pairs.first().map(|(_, p)| &p[..]),
-			pairs.get(1).map(|(_, p)| &p[..]),
-		) {
-			(Some([a, b]), Some([c, d])) => ([*a, *b], [*c, *d]),
-			_ => return Err(Self::Error::NoTwoPair),
-		};
-
-		Ok(Self {
-			high_pair,
-			low_pair,
-			kickers: kickers_from(
-				&candidate.sorted_cards,
-				&[high_pair, low_pair].concat(),
-			),
-		})
-	}
-}
-
 fn try_triplet_from(sorted_cards: &[Card]) -> Result<[Card; 3], ExtractError> {
-	let grouped = group_by(sorted_cards, |c| c.rank);
-	let triplet = grouped.iter().find(|(_, cards)| cards.len() >= 3);
-
-	match triplet.map(|(_, t)| &t[..]) {
+	match group_by(sorted_cards, |c| c.rank)
+		.iter()
+		.find(|(_, cards)| cards.len() >= 3)
+		.map(|(_, t)| &t[..])
+	{
 		Some([a, b, c, ..]) => Ok([*a, *b, *c]),
 		_ => Err(ExtractError::NoThreeOfAKind),
-	}
-}
-
-impl TryFrom<&HandCandidate> for ThreeOfAKind {
-	type Error = ExtractError;
-
-	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		let triplet = try_triplet_from(&candidate.sorted_cards)?;
-
-		Ok(Self {
-			triplet,
-			kickers: kickers_from(&candidate.sorted_cards, &triplet),
-		})
 	}
 }
 
@@ -174,6 +100,94 @@ fn try_straight_from(sorted_cards: &[Card]) -> Result<[Card; 5], ExtractError> {
 	}
 }
 
+#[allow(clippy::many_single_char_names)]
+fn try_flush_from(sorted_cards: &[Card]) -> Result<[Card; 5], ExtractError> {
+	match group_by(sorted_cards, |c| c.suit)
+		.iter()
+		.find(|(_, cards)| cards.len() >= 5)
+		.map(|(_, q)| &q[..])
+	{
+		Some([a, b, c, d, e, ..]) => Ok([*a, *b, *c, *d, *e]),
+		_ => Err(ExtractError::NoFlush),
+	}
+}
+
+impl TryFrom<&HandCandidate> for HighCard {
+	type Error = ExtractError;
+
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		let high_card = candidate
+			.sorted_cards
+			.first()
+			.ok_or(Self::Error::NotEnoughCards)?;
+		let kicker_cards = candidate
+			.sorted_cards
+			.get(1..5)
+			.unwrap_or_default()
+			.to_vec();
+
+		Ok(Self {
+			high_card: high_card.to_owned(),
+			kickers: kicker_cards,
+		})
+	}
+}
+
+impl TryFrom<&HandCandidate> for Pair {
+	type Error = ExtractError;
+
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		let pair = try_pair_from(&candidate.sorted_cards)?;
+
+		Ok(Self {
+			pair,
+			kickers: kickers_from(&candidate.sorted_cards, &pair),
+		})
+	}
+}
+
+impl TryFrom<&HandCandidate> for TwoPair {
+	type Error = ExtractError;
+
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		let grouped = group_by(&candidate.sorted_cards, |c| c.rank);
+		let pairs = grouped
+			.iter()
+			.filter(|(_, cards)| cards.len() >= 2)
+			.collect::<Vec<_>>();
+
+		let (high_pair, low_pair) = match (
+			pairs.first().map(|(_, p)| &p[..]),
+			pairs.get(1).map(|(_, p)| &p[..]),
+		) {
+			(Some([a, b, ..]), Some([c, d, ..])) => ([*a, *b], [*c, *d]),
+			_ => return Err(Self::Error::NoTwoPair),
+		};
+
+		Ok(Self {
+			high_pair,
+			low_pair,
+			kickers: kickers_from(
+				&candidate.sorted_cards,
+				&[high_pair, low_pair].concat(),
+			),
+		})
+	}
+}
+
+impl TryFrom<&HandCandidate> for ThreeOfAKind {
+	type Error = ExtractError;
+
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		let triplet = try_triplet_from(&candidate.sorted_cards)?;
+
+		Ok(Self {
+			triplet,
+			kickers: kickers_from(&candidate.sorted_cards, &triplet),
+		})
+	}
+}
+
 impl TryFrom<&HandCandidate> for Straight {
 	type Error = ExtractError;
 
@@ -181,17 +195,6 @@ impl TryFrom<&HandCandidate> for Straight {
 		Ok(Self {
 			straight: try_straight_from(&candidate.sorted_cards)?,
 		})
-	}
-}
-
-#[allow(clippy::many_single_char_names)]
-fn try_flush_from(sorted_cards: &[Card]) -> Result<[Card; 5], ExtractError> {
-	let grouped = group_by(sorted_cards, |c| c.suit);
-	let quintuplet = grouped.iter().find(|(_, cards)| cards.len() >= 5);
-
-	match quintuplet.map(|(_, q)| &q[..]) {
-		Some([a, b, c, d, e, ..]) => Ok([*a, *b, *c, *d, *e]),
-		_ => Err(ExtractError::NoFlush),
 	}
 }
 
@@ -212,11 +215,12 @@ impl TryFrom<&HandCandidate> for FullHouse {
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
 		let triplet = try_triplet_from(&candidate.sorted_cards)
 			.map_err(|_| ExtractError::NoFullHouse)?;
-		let remaining_cards = without(&triplet, &candidate.sorted_cards);
-		let pair = try_pair_from(&remaining_cards)
-			.map_err(|_| ExtractError::NoFullHouse)?;
 
-		Ok(Self { triplet, pair })
+		Ok(Self {
+			triplet,
+			pair: try_pair_from(&without(&triplet, &candidate.sorted_cards))
+				.map_err(|_| ExtractError::NoFullHouse)?,
+		})
 	}
 }
 
