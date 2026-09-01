@@ -1,6 +1,6 @@
 use super::{
 	Flush, FourOfAKind, FullHouse, Hand, HighCard, Pair, Straight,
-	ThreeOfAKind, TwoPair,
+	StraightFlush, ThreeOfAKind, TwoPair,
 };
 use crate::util::cmp_max;
 use crate::{Card, Rank};
@@ -199,6 +199,28 @@ impl Eq for FourOfAKind {}
 
 //
 
+impl Ord for StraightFlush {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		cmp_straight(&self.straight_flush, &other.straight_flush)
+	}
+}
+
+impl PartialOrd for StraightFlush {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl PartialEq for StraightFlush {
+	fn eq(&self, other: &Self) -> bool {
+		self.cmp(other).is_eq()
+	}
+}
+
+impl Eq for StraightFlush {}
+
+//
+
 trait RankedHand {
 	fn rank(&self) -> u8;
 }
@@ -336,14 +358,32 @@ mod tests {
 			kickers: vec![c("8d")],
 		});
 
+		let straight_flush_9_high =
+			super::Hand::StraightFlush(super::StraightFlush {
+				straight_flush: [c("9d"), c("8d"), c("7d"), c("6d"), c("5d")],
+			});
+
+		let straight_flush_10_high =
+			super::Hand::StraightFlush(super::StraightFlush {
+				straight_flush: [c("Td"), c("9d"), c("8d"), c("7d"), c("6d")],
+			});
+
+		let straight_flush_ace_low =
+			super::Hand::StraightFlush(super::StraightFlush {
+				straight_flush: [c("5d"), c("4d"), c("3d"), c("2d"), c("Ad")],
+			});
+
 		let mut hands = [
 			&straight_ace_high,
 			&four_of_a_kind_9_6,
 			&two_pair_jack_sixes,
+			&straight_flush_10_high,
 			&flush_seven_high,
 			&full_house_ace_king,
 			&four_of_a_kind_j,
+			&straight_flush_ace_low,
 			&straight_ace_low,
+			&straight_flush_9_high,
 			&full_house_10_3,
 			&four_of_a_kind_9_2,
 			&high_king_10_kicker,
@@ -373,6 +413,9 @@ mod tests {
 				&four_of_a_kind_9_2,
 				&four_of_a_kind_9_6,
 				&four_of_a_kind_j,
+				&straight_flush_ace_low,
+				&straight_flush_9_high,
+				&straight_flush_10_high,
 			],
 			hands,
 		);

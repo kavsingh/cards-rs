@@ -1,9 +1,9 @@
 use thiserror::Error;
 
 use super::{
-	Hand, HandCandidate, HighCard, Pair, Straight, ThreeOfAKind, TwoPair,
+	Flush, FourOfAKind, FullHouse, Hand, HandCandidate, HighCard, Pair,
+	Straight, StraightFlush, ThreeOfAKind, TwoPair,
 };
-use crate::hand2::{Flush, FourOfAKind, FullHouse};
 use crate::util::{chunk_by, group_by, without};
 use crate::{Card, Rank};
 
@@ -25,6 +25,8 @@ pub enum ExtractError {
 	NoFullHouse,
 	#[error("four of a kind not found")]
 	NoFourOfAKind,
+	#[error("straight flush not found")]
+	NoStraightFlush,
 }
 
 fn kickers_from(cards: &[Card], exclude: &[Card]) -> Vec<Card> {
@@ -60,12 +62,9 @@ impl TryFrom<&HandCandidate> for HighCard {
 
 fn try_pair_from(sorted_cards: &[Card]) -> Result<[Card; 2], ExtractError> {
 	let grouped = group_by(sorted_cards, |c| c.rank);
-	let pairs = grouped
-		.iter()
-		.filter(|(_, cards)| cards.len() >= 2)
-		.collect::<Vec<_>>();
+	let pair = grouped.iter().find(|(_, cards)| cards.len() >= 2);
 
-	match pairs.first().map(|(_, p)| &p[..]) {
+	match pair.map(|(_, p)| &p[..]) {
 		Some([a, b, ..]) => Ok([*a, *b]),
 		_ => Err(ExtractError::NoPair),
 	}
@@ -115,12 +114,9 @@ impl TryFrom<&HandCandidate> for TwoPair {
 
 fn try_triplet_from(sorted_cards: &[Card]) -> Result<[Card; 3], ExtractError> {
 	let grouped = group_by(sorted_cards, |c| c.rank);
-	let triplets = grouped
-		.iter()
-		.filter(|(_, cards)| cards.len() >= 3)
-		.collect::<Vec<_>>();
+	let triplet = grouped.iter().find(|(_, cards)| cards.len() >= 3);
 
-	match triplets.first().map(|(_, t)| &t[..]) {
+	match triplet.map(|(_, t)| &t[..]) {
 		Some([a, b, c, ..]) => Ok([*a, *b, *c]),
 		_ => Err(ExtractError::NoThreeOfAKind),
 	}
@@ -140,11 +136,9 @@ impl TryFrom<&HandCandidate> for ThreeOfAKind {
 }
 
 #[allow(clippy::many_single_char_names)]
-fn try_straight_from(
-	candidate: &HandCandidate,
-) -> Result<[Card; 5], ExtractError> {
+fn try_straight_from(sorted_cards: &[Card]) -> Result<[Card; 5], ExtractError> {
 	let candidate_straight: Vec<_> =
-		chunk_by(&candidate.sorted_cards, |a, b| a.rank_diff(b) == 1)
+		chunk_by(sorted_cards, |a, b| a.rank_diff(b) == 1)
 			.into_iter()
 			.find(|chunk| chunk.len() >= 4)
 			.ok_or(ExtractError::NoStraight)?;
@@ -162,8 +156,7 @@ fn try_straight_from(
 		return Err(ExtractError::NoStraight);
 	}
 
-	let ace = candidate
-		.sorted_cards
+	let ace = sorted_cards
 		.iter()
 		.find(|c| c.rank == Rank::Ace)
 		.ok_or(ExtractError::NoStraight)?;
@@ -184,8 +177,19 @@ impl TryFrom<&HandCandidate> for Straight {
 
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
 		Ok(Self {
-			straight: try_straight_from(candidate)?,
+			straight: try_straight_from(&candidate.sorted_cards)?,
 		})
+	}
+}
+
+#[allow(clippy::many_single_char_names)]
+fn try_flush_from(sorted_cards: &[Card]) -> Result<[Card; 5], ExtractError> {
+	let grouped = group_by(sorted_cards, |c| c.suit);
+	let quintuplet = grouped.iter().find(|(_, cards)| cards.len() >= 5);
+
+	match quintuplet.map(|(_, q)| &q[..]) {
+		Some([a, b, c, d, e, ..]) => Ok([*a, *b, *c, *d, *e]),
+		_ => Err(ExtractError::NoFlush),
 	}
 }
 
@@ -194,18 +198,9 @@ impl TryFrom<&HandCandidate> for Flush {
 
 	#[allow(clippy::many_single_char_names)]
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		let flush: Vec<_> = group_by(&candidate.sorted_cards, |c| c.suit)
-			.into_iter()
-			.find(|(_, cards)| cards.len() >= 5)
-			.map(|(_, cards)| cards.into_iter().take(5).collect())
-			.ok_or(ExtractError::NoFlush)?;
-
-		match &flush[..] {
-			[a, b, c, d, e] => Ok(Self {
-				flush: [*a, *b, *c, *d, *e],
-			}),
-			_ => Err(ExtractError::NoFlush),
-		}
+		Ok(Self {
+			flush: try_flush_from(&candidate.sorted_cards)?,
+		})
 	}
 }
 
@@ -229,12 +224,9 @@ impl TryFrom<&HandCandidate> for FourOfAKind {
 	#[allow(clippy::many_single_char_names)]
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
 		let grouped = group_by(&candidate.sorted_cards, |c| c.rank);
-		let quadruplets = grouped
-			.iter()
-			.filter(|(_, cards)| cards.len() >= 4)
-			.collect::<Vec<_>>();
+		let quadruplets = grouped.iter().find(|(_, cards)| cards.len() >= 4);
 
-		let quad = match quadruplets.first().map(|(_, q)| &q[..]) {
+		let quad = match quadruplets.map(|(_, q)| &q[..]) {
 			Some([a, b, c, d, ..]) => [*a, *b, *c, *d],
 			_ => Err(ExtractError::NoFourOfAKind)?,
 		};
@@ -246,12 +238,27 @@ impl TryFrom<&HandCandidate> for FourOfAKind {
 	}
 }
 
+impl TryFrom<&HandCandidate> for StraightFlush {
+	type Error = ExtractError;
+
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		let straight_flush = try_flush_from(&candidate.sorted_cards)
+			.and_then(|cs| try_straight_from(&cs))
+			.map_err(|_| ExtractError::NoStraightFlush)?;
+
+		Ok(Self { straight_flush })
+	}
+}
+
 impl TryFrom<&HandCandidate> for Hand {
 	type Error = ExtractError;
 
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		FourOfAKind::try_from(candidate)
-			.map(Self::FourOfAKind)
+		StraightFlush::try_from(candidate)
+			.map(Self::StraightFlush)
+			.or_else(|_| {
+				FourOfAKind::try_from(candidate).map(Self::FourOfAKind)
+			})
 			.or_else(|_| FullHouse::try_from(candidate).map(Self::FullHouse))
 			.or_else(|_| Flush::try_from(candidate).map(Self::Flush))
 			.or_else(|_| Straight::try_from(candidate).map(Self::Straight))
@@ -558,6 +565,113 @@ mod tests {
 			assert_eq!(&hand.kickers.first().unwrap().to_string(), "Qc");
 		} else {
 			panic!("Expected FourOfAKind hand");
+		}
+	}
+
+	#[test]
+	fn should_extract_straight_flush() {
+		let pocket_cards = [
+			Card::new(Rank::Two, Suit::Clubs),
+			Card::new(Rank::Six, Suit::Clubs),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Four, Suit::Clubs),
+			Card::new(Rank::Three, Suit::Clubs),
+			Card::new(Rank::Eight, Suit::Spades),
+			Card::new(Rank::Five, Suit::Clubs),
+			Card::new(Rank::Six, Suit::Spades),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::StraightFlush(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.straight_flush[0].to_string(), "6c");
+			assert_eq!(&hand.straight_flush[1].to_string(), "5c");
+			assert_eq!(&hand.straight_flush[2].to_string(), "4c");
+			assert_eq!(&hand.straight_flush[3].to_string(), "3c");
+			assert_eq!(&hand.straight_flush[4].to_string(), "2c");
+		} else {
+			panic!("Expected StraightFlush hand");
+		}
+	}
+
+	#[test]
+	fn should_extract_straight_flush_ace_low() {
+		let pocket_cards = [
+			Card::new(Rank::Ace, Suit::Spades),
+			Card::new(Rank::Eight, Suit::Hearts),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Four, Suit::Spades),
+			Card::new(Rank::Two, Suit::Spades),
+			Card::new(Rank::Three, Suit::Spades),
+			Card::new(Rank::Five, Suit::Spades),
+			Card::new(Rank::Eight, Suit::Diamonds),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::StraightFlush(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.straight_flush[0].to_string(), "5s");
+			assert_eq!(&hand.straight_flush[1].to_string(), "4s");
+			assert_eq!(&hand.straight_flush[2].to_string(), "3s");
+			assert_eq!(&hand.straight_flush[3].to_string(), "2s");
+			assert_eq!(&hand.straight_flush[4].to_string(), "As");
+		} else {
+			panic!("Expected StraightFlush hand");
+		}
+	}
+
+	#[test]
+	fn should_not_extract_straight_flush_offsuit_ace() {
+		let pocket_cards = [
+			Card::new(Rank::Ace, Suit::Clubs),
+			Card::new(Rank::Two, Suit::Spades),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Three, Suit::Spades),
+			Card::new(Rank::Four, Suit::Spades),
+			Card::new(Rank::Five, Suit::Spades),
+			Card::new(Rank::Eight, Suit::Spades),
+		];
+
+		if let Ok(Hand::Flush(hand)) =
+			Hand::try_from(&HandCandidate::new(&pocket_cards, &community_cards))
+		{
+			assert_eq!(&hand.flush[0].to_string(), "8s");
+			assert_eq!(&hand.flush[1].to_string(), "5s");
+			assert_eq!(&hand.flush[2].to_string(), "4s");
+			assert_eq!(&hand.flush[3].to_string(), "3s");
+			assert_eq!(&hand.flush[4].to_string(), "2s");
+		} else {
+			panic!("Expected Flush hand");
+		}
+	}
+
+	#[test]
+	fn should_not_extract_straight_flush_ambiguous_ace() {
+		let pocket_cards = [
+			Card::new(Rank::Ace, Suit::Diamonds),
+			Card::new(Rank::Five, Suit::Diamonds),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Nine, Suit::Diamonds),
+			Card::new(Rank::Queen, Suit::Diamonds),
+			Card::new(Rank::Seven, Suit::Diamonds),
+			Card::new(Rank::King, Suit::Diamonds),
+			Card::new(Rank::Jack, Suit::Diamonds),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::Flush(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.flush[0].to_string(), "Ad");
+			assert_eq!(&hand.flush[1].to_string(), "Kd");
+			assert_eq!(&hand.flush[2].to_string(), "Qd");
+			assert_eq!(&hand.flush[3].to_string(), "Jd");
+			assert_eq!(&hand.flush[4].to_string(), "9d");
+		} else {
+			panic!("Expected Flush hand");
 		}
 	}
 }
