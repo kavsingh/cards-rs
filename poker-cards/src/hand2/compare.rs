@@ -1,5 +1,6 @@
 use super::{
-	Flush, FullHouse, Hand, HighCard, Pair, Straight, ThreeOfAKind, TwoPair,
+	Flush, FourOfAKind, FullHouse, Hand, HighCard, Pair, Straight,
+	ThreeOfAKind, TwoPair,
 };
 use crate::util::cmp_max;
 use crate::{Card, Rank};
@@ -175,6 +176,29 @@ impl Eq for FullHouse {}
 
 //
 
+impl Ord for FourOfAKind {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		cmp_max(&self.quad, &other.quad)
+			.then_with(|| cmp_max(&self.kickers, &other.kickers))
+	}
+}
+
+impl PartialOrd for FourOfAKind {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl PartialEq for FourOfAKind {
+	fn eq(&self, other: &Self) -> bool {
+		self.cmp(other).is_eq()
+	}
+}
+
+impl Eq for FourOfAKind {}
+
+//
+
 trait RankedHand {
 	fn rank(&self) -> u8;
 }
@@ -208,6 +232,7 @@ impl Ord for Hand {
 				(Self::Straight(a), Self::Straight(b)) => a.cmp(b),
 				(Self::Flush(a), Self::Flush(b)) => a.cmp(b),
 				(Self::FullHouse(a), Self::FullHouse(b)) => a.cmp(b),
+				(Self::FourOfAKind(a), Self::FourOfAKind(b)) => a.cmp(b),
 				_ => std::cmp::Ordering::Equal,
 			})
 	}
@@ -232,8 +257,6 @@ impl Eq for Hand {}
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::panic)]
 mod tests {
-	use super::{Hand, HighCard, Straight, TwoPair};
-
 	fn c(s: &str) -> super::Card {
 		s.parse().unwrap()
 	}
@@ -241,70 +264,88 @@ mod tests {
 	#[test]
 	#[allow(clippy::too_many_lines)]
 	fn should_compare_hands() {
-		let high_king_10_kicker = Hand::HighCard(HighCard {
+		let high_king_10_kicker = super::Hand::HighCard(super::HighCard {
 			high_card: c("Kd"),
 			kickers: vec![c("Tc")],
 		});
 
-		let high_king_6_kicker = Hand::HighCard(HighCard {
+		let high_king_6_kicker = super::Hand::HighCard(super::HighCard {
 			high_card: c("Kc"),
 			kickers: vec![c("6d")],
 		});
 
-		let two_pair_jack_sixes = Hand::TwoPair(TwoPair {
+		let two_pair_jack_sixes = super::Hand::TwoPair(super::TwoPair {
 			high_pair: [c("Jd"), c("Jc")],
 			low_pair: [c("6d"), c("6c")],
 			kickers: vec![],
 		});
 
-		let two_pair_jack_fives = Hand::TwoPair(TwoPair {
+		let two_pair_jack_fives = super::Hand::TwoPair(super::TwoPair {
 			high_pair: [c("Jd"), c("Jc")],
 			low_pair: [c("5d"), c("5c")],
 			kickers: vec![],
 		});
 
-		let straight_no_ace = Hand::Straight(Straight {
+		let straight_no_ace = super::Hand::Straight(super::Straight {
 			straight: [c("6h"), c("5d"), c("4c"), c("3d"), c("2s")],
 		});
 
-		let straight_ace_low = Hand::Straight(Straight {
+		let straight_ace_low = super::Hand::Straight(super::Straight {
 			straight: [c("5d"), c("4c"), c("3d"), c("2h"), c("Ad")],
 		});
 
-		let straight_ace_high = Hand::Straight(Straight {
+		let straight_ace_high = super::Hand::Straight(super::Straight {
 			straight: [c("Ad"), c("Kc"), c("Qh"), c("Jd"), c("Ts")],
 		});
 
-		let flush_king_high = Hand::Flush(super::Flush {
+		let flush_king_high = super::Hand::Flush(super::Flush {
 			flush: [c("Kd"), c("Qd"), c("8d"), c("7d"), c("4d")],
 		});
 
-		let flush_seven_high = Hand::Flush(super::Flush {
+		let flush_seven_high = super::Hand::Flush(super::Flush {
 			flush: [c("7s"), c("6s"), c("5s"), c("3s"), c("2s")],
 		});
 
-		let full_house_ace_king = Hand::FullHouse(super::FullHouse {
+		let full_house_ace_king = super::Hand::FullHouse(super::FullHouse {
 			triplet: [c("Ad"), c("Ac"), c("Ah")],
 			pair: [c("Kd"), c("Kc")],
 		});
 
-		let full_house_ace_6 = Hand::FullHouse(super::FullHouse {
+		let full_house_ace_6 = super::Hand::FullHouse(super::FullHouse {
 			triplet: [c("Ad"), c("Ac"), c("Ah")],
 			pair: [c("6d"), c("6c")],
 		});
 
-		let full_house_10_3 = Hand::FullHouse(super::FullHouse {
+		let full_house_10_3 = super::Hand::FullHouse(super::FullHouse {
 			triplet: [c("Td"), c("Tc"), c("Th")],
 			pair: [c("3d"), c("3c")],
 		});
 
+		let four_of_a_kind_9_2 = super::Hand::FourOfAKind(super::FourOfAKind {
+			quad: [c("9d"), c("9c"), c("9h"), c("9s")],
+			kickers: vec![c("2d")],
+		});
+
+		let four_of_a_kind_9_6 = super::Hand::FourOfAKind(super::FourOfAKind {
+			quad: [c("9d"), c("9c"), c("9h"), c("9s")],
+			kickers: vec![c("6d")],
+		});
+
+		let four_of_a_kind_j = super::Hand::FourOfAKind(super::FourOfAKind {
+			quad: [c("Jd"), c("Jc"), c("Jh"), c("Js")],
+			kickers: vec![c("8d")],
+		});
+
 		let mut hands = [
 			&straight_ace_high,
+			&four_of_a_kind_9_6,
 			&two_pair_jack_sixes,
 			&flush_seven_high,
 			&full_house_ace_king,
+			&four_of_a_kind_j,
 			&straight_ace_low,
 			&full_house_10_3,
+			&four_of_a_kind_9_2,
 			&high_king_10_kicker,
 			&full_house_ace_6,
 			&two_pair_jack_fives,
@@ -329,6 +370,9 @@ mod tests {
 				&full_house_10_3,
 				&full_house_ace_6,
 				&full_house_ace_king,
+				&four_of_a_kind_9_2,
+				&four_of_a_kind_9_6,
+				&four_of_a_kind_j,
 			],
 			hands,
 		);
