@@ -102,7 +102,7 @@ impl FromStr for Rank {
 			"7" => Ok(Self::Seven),
 			"8" => Ok(Self::Eight),
 			"9" => Ok(Self::Nine),
-			"10" => Ok(Self::Ten),
+			"T" => Ok(Self::Ten),
 			"J" => Ok(Self::Jack),
 			"Q" => Ok(Self::Queen),
 			"K" => Ok(Self::King),
@@ -159,7 +159,7 @@ mod tests {
 	#[test]
 	#[allow(clippy::unwrap_used)]
 	fn test_card_from_str() {
-		let card: Card = "10h".parse().unwrap();
+		let card: Card = "Th".parse().unwrap();
 
 		assert_eq!(card.rank, Rank::Ten);
 		assert_eq!(card.suit, Suit::Hearts);
@@ -174,7 +174,7 @@ mod tests {
 			CardParseError::InvalidRank("Z".to_string())
 		);
 		assert_eq!(
-			"10q".parse::<Card>().unwrap_err(),
+			"Tq".parse::<Card>().unwrap_err(),
 			CardParseError::InvalidSuit("q".to_string())
 		);
 		assert_eq!(
