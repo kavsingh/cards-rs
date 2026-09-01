@@ -77,7 +77,7 @@ impl Display for Rank {
 			Self::Seven => "7",
 			Self::Eight => "8",
 			Self::Nine => "9",
-			Self::Ten => "10",
+			Self::Ten => "T",
 			Self::Jack => "J",
 			Self::Queen => "Q",
 			Self::King => "K",
