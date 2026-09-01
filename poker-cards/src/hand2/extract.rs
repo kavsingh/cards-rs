@@ -4,10 +4,10 @@ use super::{
 	Flush, FourOfAKind, FullHouse, Hand, HandCandidate, HighCard, Pair,
 	RoyalFlush, Straight, StraightFlush, ThreeOfAKind, TwoPair,
 };
-use crate::util::{chunk_by, group_by, without};
+use crate::util::{chunk_by, get_n_by, group_by, without};
 use crate::{Card, Rank};
 
-#[derive(Debug, Error, PartialEq, Eq)]
+#[derive(Debug, Error, PartialEq, Eq, Copy, Clone)]
 pub enum ExtractError {
 	#[error("not enough cards to extract a hand")]
 	NotEnoughCards,
@@ -39,28 +39,6 @@ fn kickers_from(cards: &[Card], exclude: &[Card]) -> Vec<Card> {
 		.take(max.saturating_sub(exclude.len()))
 		.copied()
 		.collect()
-}
-
-fn try_pair_from(sorted_cards: &[Card]) -> Result<[Card; 2], ExtractError> {
-	match group_by(sorted_cards, |c| c.rank)
-		.iter()
-		.find(|(_, cards)| cards.len() >= 2)
-		.map(|(_, p)| &p[..])
-	{
-		Some([a, b, ..]) => Ok([*a, *b]),
-		_ => Err(ExtractError::NoPair),
-	}
-}
-
-fn try_triplet_from(sorted_cards: &[Card]) -> Result<[Card; 3], ExtractError> {
-	match group_by(sorted_cards, |c| c.rank)
-		.iter()
-		.find(|(_, cards)| cards.len() >= 3)
-		.map(|(_, t)| &t[..])
-	{
-		Some([a, b, c, ..]) => Ok([*a, *b, *c]),
-		_ => Err(ExtractError::NoThreeOfAKind),
-	}
 }
 
 #[allow(clippy::many_single_char_names)]
@@ -100,18 +78,6 @@ fn try_straight_from(sorted_cards: &[Card]) -> Result<[Card; 5], ExtractError> {
 	}
 }
 
-#[allow(clippy::many_single_char_names)]
-fn try_flush_from(sorted_cards: &[Card]) -> Result<[Card; 5], ExtractError> {
-	match group_by(sorted_cards, |c| c.suit)
-		.iter()
-		.find(|(_, cards)| cards.len() >= 5)
-		.map(|(_, q)| &q[..])
-	{
-		Some([a, b, c, d, e, ..]) => Ok([*a, *b, *c, *d, *e]),
-		_ => Err(ExtractError::NoFlush),
-	}
-}
-
 impl TryFrom<&HandCandidate> for HighCard {
 	type Error = ExtractError;
 
@@ -137,7 +103,8 @@ impl TryFrom<&HandCandidate> for Pair {
 	type Error = ExtractError;
 
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		let pair = try_pair_from(&candidate.sorted_cards)?;
+		let pair = get_n_by::<_, _, 2>(&candidate.sorted_cards, |c| c.rank)
+			.ok_or(Self::Error::NoPair)?;
 
 		Ok(Self {
 			pair,
@@ -179,7 +146,8 @@ impl TryFrom<&HandCandidate> for ThreeOfAKind {
 	type Error = ExtractError;
 
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		let triplet = try_triplet_from(&candidate.sorted_cards)?;
+		let triplet = get_n_by::<_, _, 3>(&candidate.sorted_cards, |c| c.rank)
+			.ok_or(ExtractError::NoThreeOfAKind)?;
 
 		Ok(Self {
 			triplet,
@@ -204,7 +172,8 @@ impl TryFrom<&HandCandidate> for Flush {
 	#[allow(clippy::many_single_char_names)]
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
 		Ok(Self {
-			flush: try_flush_from(&candidate.sorted_cards)?,
+			flush: get_n_by::<_, _, 5>(&candidate.sorted_cards, |c| c.suit)
+				.ok_or(ExtractError::NoFlush)?,
 		})
 	}
 }
@@ -213,14 +182,15 @@ impl TryFrom<&HandCandidate> for FullHouse {
 	type Error = ExtractError;
 
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		let triplet = try_triplet_from(&candidate.sorted_cards)
-			.map_err(|_| ExtractError::NoFullHouse)?;
+		let triplet = get_n_by::<_, _, 3>(&candidate.sorted_cards, |c| c.rank)
+			.ok_or(ExtractError::NoFullHouse)?;
+		let pair = get_n_by::<_, _, 2>(
+			&without(&triplet, &candidate.sorted_cards),
+			|c| c.rank,
+		)
+		.ok_or(ExtractError::NoFullHouse)?;
 
-		Ok(Self {
-			triplet,
-			pair: try_pair_from(&without(&triplet, &candidate.sorted_cards))
-				.map_err(|_| ExtractError::NoFullHouse)?,
-		})
+		Ok(Self { triplet, pair })
 	}
 }
 
@@ -229,13 +199,8 @@ impl TryFrom<&HandCandidate> for FourOfAKind {
 
 	#[allow(clippy::many_single_char_names)]
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		let grouped = group_by(&candidate.sorted_cards, |c| c.rank);
-		let quadruplets = grouped.iter().find(|(_, cards)| cards.len() >= 4);
-
-		let quad = match quadruplets.map(|(_, q)| &q[..]) {
-			Some([a, b, c, d, ..]) => [*a, *b, *c, *d],
-			_ => Err(ExtractError::NoFourOfAKind)?,
-		};
+		let quad = get_n_by::<_, _, 4>(&candidate.sorted_cards, |c| c.rank)
+			.ok_or(ExtractError::NoFourOfAKind)?;
 
 		Ok(Self {
 			quad,
@@ -248,9 +213,10 @@ impl TryFrom<&HandCandidate> for StraightFlush {
 	type Error = ExtractError;
 
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		let straight_flush = try_flush_from(&candidate.sorted_cards)
-			.and_then(|cs| try_straight_from(&cs))
-			.map_err(|_| ExtractError::NoStraightFlush)?;
+		let straight_flush =
+			get_n_by::<_, _, 5>(&candidate.sorted_cards, |c| c.suit)
+				.and_then(|cs| try_straight_from(&cs).ok())
+				.ok_or(ExtractError::NoStraightFlush)?;
 
 		Ok(Self { straight_flush })
 	}
@@ -260,13 +226,13 @@ impl TryFrom<&HandCandidate> for RoyalFlush {
 	type Error = ExtractError;
 
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		match StraightFlush::try_from(candidate) {
-			Ok(StraightFlush { straight_flush })
-				if straight_flush[0].rank == Rank::Ace =>
-			{
-				Ok(Self {
-					royal_flush: straight_flush,
-				})
+		let straight_flush =
+			get_n_by::<_, _, 5>(&candidate.sorted_cards, |c| c.suit)
+				.and_then(|cs| try_straight_from(&cs).ok());
+
+		match straight_flush {
+			Some(royal_flush) if royal_flush[0].rank == Rank::Ace => {
+				Ok(Self { royal_flush })
 			}
 			_ => Err(ExtractError::NoRoyalFlush),
 		}

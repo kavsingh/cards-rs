@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use crate::{Card, Rank};
 
-pub fn without<TItem: Copy + Eq>(
+pub fn without<TItem: Copy + PartialEq>(
 	items: &[TItem],
 	from_items: &[TItem],
 ) -> Vec<TItem> {
@@ -13,7 +13,7 @@ pub fn without<TItem: Copy + Eq>(
 		.collect()
 }
 
-pub fn group_by<TItem: Copy, TKey: Eq>(
+pub fn group_by<TItem: Copy, TKey: PartialEq>(
 	items: &[TItem],
 	key_fn: impl Fn(&TItem) -> TKey,
 ) -> Vec<(TKey, Vec<TItem>)> {
@@ -51,6 +51,19 @@ pub fn chunk_by<TItem: Copy>(
 	}
 
 	chunks
+}
+
+pub fn get_n_by<TItem: Copy, V, const N: usize>(
+	items: &[TItem],
+	selector: impl Fn(&TItem) -> V,
+) -> Option<[TItem; N]>
+where
+	V: PartialEq,
+{
+	group_by(items, selector)
+		.into_iter()
+		.find(|(_, ts)| ts.len() >= N)
+		.and_then(|(_, ts)| ts.get(..N).and_then(|slice| slice.try_into().ok()))
 }
 
 pub fn cmp_max<T: Ord>(a_opt: &[T], b_opt: &[T]) -> Ordering {
