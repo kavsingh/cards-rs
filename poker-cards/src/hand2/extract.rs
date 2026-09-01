@@ -312,8 +312,8 @@ mod tests {
 		if let Ok(Hand::TwoPair(hand)) = Hand::try_from(&candidate) {
 			assert_eq!(&hand.high_pair[0].to_string(), "Ah");
 			assert_eq!(&hand.high_pair[1].to_string(), "Ad");
-			assert_eq!(&hand.low_pair[0].to_string(), "10d");
-			assert_eq!(&hand.low_pair[1].to_string(), "10h");
+			assert_eq!(&hand.low_pair[0].to_string(), "Td");
+			assert_eq!(&hand.low_pair[1].to_string(), "Th");
 			assert_eq!(hand.kickers.len(), 1);
 		} else {
 			panic!("Expected TwoPair hand");
