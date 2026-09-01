@@ -1,5 +1,5 @@
 use super::{
-	Flush, FourOfAKind, FullHouse, Hand, HighCard, Pair, Straight,
+	Flush, FourOfAKind, FullHouse, Hand, HighCard, Pair, RoyalFlush, Straight,
 	StraightFlush, ThreeOfAKind, TwoPair,
 };
 use crate::util::cmp_max;
@@ -221,6 +221,28 @@ impl Eq for StraightFlush {}
 
 //
 
+impl Ord for RoyalFlush {
+	fn cmp(&self, _: &Self) -> std::cmp::Ordering {
+		std::cmp::Ordering::Equal
+	}
+}
+
+impl PartialOrd for RoyalFlush {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl PartialEq for RoyalFlush {
+	fn eq(&self, other: &Self) -> bool {
+		self.cmp(other).is_eq()
+	}
+}
+
+impl Eq for RoyalFlush {}
+
+//
+
 trait RankedHand {
 	fn rank(&self) -> u8;
 }
@@ -255,7 +277,9 @@ impl Ord for Hand {
 				(Self::Flush(a), Self::Flush(b)) => a.cmp(b),
 				(Self::FullHouse(a), Self::FullHouse(b)) => a.cmp(b),
 				(Self::FourOfAKind(a), Self::FourOfAKind(b)) => a.cmp(b),
-				_ => std::cmp::Ordering::Equal,
+				(Self::StraightFlush(a), Self::StraightFlush(b)) => a.cmp(b),
+				(Self::RoyalFlush(a), Self::RoyalFlush(b)) => a.cmp(b),
+				_ => std::cmp::Ordering::Less,
 			})
 	}
 }
@@ -373,11 +397,20 @@ mod tests {
 				straight_flush: [c("5d"), c("4d"), c("3d"), c("2d"), c("Ad")],
 			});
 
+		let royal_flush_diamonds = super::Hand::RoyalFlush(super::RoyalFlush {
+			royal_flush: [c("Ad"), c("Kd"), c("Qd"), c("Jd"), c("Td")],
+		});
+
+		let royal_flush_clubs = super::Hand::RoyalFlush(super::RoyalFlush {
+			royal_flush: [c("Ac"), c("Kc"), c("Qc"), c("Jc"), c("Tc")],
+		});
+
 		let mut hands = [
 			&straight_ace_high,
 			&four_of_a_kind_9_6,
 			&two_pair_jack_sixes,
 			&straight_flush_10_high,
+			&royal_flush_clubs,
 			&flush_seven_high,
 			&full_house_ace_king,
 			&four_of_a_kind_j,
@@ -386,6 +419,7 @@ mod tests {
 			&straight_flush_9_high,
 			&full_house_10_3,
 			&four_of_a_kind_9_2,
+			&royal_flush_diamonds,
 			&high_king_10_kicker,
 			&full_house_ace_6,
 			&two_pair_jack_fives,
@@ -416,6 +450,8 @@ mod tests {
 				&straight_flush_ace_low,
 				&straight_flush_9_high,
 				&straight_flush_10_high,
+				&royal_flush_clubs,
+				&royal_flush_diamonds,
 			],
 			hands,
 		);
