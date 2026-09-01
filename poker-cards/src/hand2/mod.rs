@@ -75,6 +75,18 @@ pub struct FourOfAKind {
 	pub kickers: Vec<Card>,
 }
 
+#[non_exhaustive]
+#[derive(Debug)]
+pub struct StraightFlush {
+	pub straight_flush: [Card; 5],
+}
+
+#[non_exhaustive]
+#[derive(Debug)]
+pub struct RoyalFlush {
+	pub royal_flush: [Card; 5],
+}
+
 #[derive(Debug)]
 pub enum Hand {
 	HighCard(HighCard),
@@ -85,6 +97,6 @@ pub enum Hand {
 	Flush(Flush),
 	FullHouse(FullHouse),
 	FourOfAKind(FourOfAKind),
-	StraightFlush(Straight),
-	RoyalFlush(Straight),
+	StraightFlush(StraightFlush),
+	RoyalFlush(RoyalFlush),
 }
