@@ -1,6 +1,7 @@
 mod card;
 mod hand;
 mod hand2;
+mod macros;
 mod util;
 
 pub use cards::{Rank, Suit, create_deck};
