@@ -3,101 +3,7 @@ use super::{
 	StraightFlush, ThreeOfAKind, TwoPair,
 };
 use crate::util::cmp_max;
-use crate::{Card, Rank};
-
-impl Ord for HighCard {
-	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-		self.high_card
-			.cmp(&other.high_card)
-			.then_with(|| cmp_max(&self.kickers, &other.kickers))
-	}
-}
-
-impl PartialOrd for HighCard {
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		Some(self.cmp(other))
-	}
-}
-
-impl PartialEq for HighCard {
-	fn eq(&self, other: &Self) -> bool {
-		self.cmp(other).is_eq()
-	}
-}
-
-impl Eq for HighCard {}
-
-//
-
-impl Ord for Pair {
-	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-		cmp_max(&self.pair, &other.pair)
-			.then_with(|| cmp_max(&self.kickers, &other.kickers))
-	}
-}
-
-impl PartialOrd for Pair {
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		Some(self.cmp(other))
-	}
-}
-
-impl PartialEq for Pair {
-	fn eq(&self, other: &Self) -> bool {
-		self.cmp(other).is_eq()
-	}
-}
-
-impl Eq for Pair {}
-
-//
-
-impl Ord for TwoPair {
-	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-		cmp_max(&self.high_pair, &other.high_pair)
-			.then_with(|| cmp_max(&self.low_pair, &other.low_pair))
-			.then_with(|| cmp_max(&self.kickers, &other.kickers))
-	}
-}
-
-impl PartialOrd for TwoPair {
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		Some(self.cmp(other))
-	}
-}
-
-impl PartialEq for TwoPair {
-	fn eq(&self, other: &Self) -> bool {
-		self.cmp(other).is_eq()
-	}
-}
-
-impl Eq for TwoPair {}
-
-//
-
-impl Ord for ThreeOfAKind {
-	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-		cmp_max(&self.triplet, &other.triplet)
-			.then_with(|| cmp_max(&self.kickers, &other.kickers))
-	}
-}
-
-impl PartialOrd for ThreeOfAKind {
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		Some(self.cmp(other))
-	}
-}
-
-impl PartialEq for ThreeOfAKind {
-	fn eq(&self, other: &Self) -> bool {
-		self.cmp(other).is_eq()
-	}
-}
-
-impl Eq for ThreeOfAKind {}
-
-//
+use crate::{Card, Rank, derive_total_ord};
 
 fn cmp_straight(a: &[Card; 5], b: &[Card; 5]) -> std::cmp::Ordering {
 	match (a[4].rank == Rank::Ace, b[4].rank == Rank::Ace) {
@@ -107,7 +13,35 @@ fn cmp_straight(a: &[Card; 5], b: &[Card; 5]) -> std::cmp::Ordering {
 	}
 }
 
-//
+impl Ord for HighCard {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		self.high_card
+			.cmp(&other.high_card)
+			.then_with(|| cmp_max(&self.kickers, &other.kickers))
+	}
+}
+
+impl Ord for Pair {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		cmp_max(&self.pair, &other.pair)
+			.then_with(|| cmp_max(&self.kickers, &other.kickers))
+	}
+}
+
+impl Ord for TwoPair {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		cmp_max(&self.high_pair, &other.high_pair)
+			.then_with(|| cmp_max(&self.low_pair, &other.low_pair))
+			.then_with(|| cmp_max(&self.kickers, &other.kickers))
+	}
+}
+
+impl Ord for ThreeOfAKind {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		cmp_max(&self.triplet, &other.triplet)
+			.then_with(|| cmp_max(&self.kickers, &other.kickers))
+	}
+}
 
 impl Ord for Straight {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
@@ -115,43 +49,11 @@ impl Ord for Straight {
 	}
 }
 
-impl PartialOrd for Straight {
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		Some(self.cmp(other))
-	}
-}
-
-impl PartialEq for Straight {
-	fn eq(&self, other: &Self) -> bool {
-		self.cmp(other).is_eq()
-	}
-}
-
-impl Eq for Straight {}
-
-//
-
 impl Ord for Flush {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
 		cmp_max(&self.flush, &other.flush)
 	}
 }
-
-impl PartialOrd for Flush {
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		Some(self.cmp(other))
-	}
-}
-
-impl PartialEq for Flush {
-	fn eq(&self, other: &Self) -> bool {
-		self.cmp(other).is_eq()
-	}
-}
-
-impl Eq for Flush {}
-
-//
 
 impl Ord for FullHouse {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
@@ -160,22 +62,6 @@ impl Ord for FullHouse {
 	}
 }
 
-impl PartialOrd for FullHouse {
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		Some(self.cmp(other))
-	}
-}
-
-impl PartialEq for FullHouse {
-	fn eq(&self, other: &Self) -> bool {
-		self.cmp(other).is_eq()
-	}
-}
-
-impl Eq for FullHouse {}
-
-//
-
 impl Ord for FourOfAKind {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
 		cmp_max(&self.quad, &other.quad)
@@ -183,43 +69,11 @@ impl Ord for FourOfAKind {
 	}
 }
 
-impl PartialOrd for FourOfAKind {
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		Some(self.cmp(other))
-	}
-}
-
-impl PartialEq for FourOfAKind {
-	fn eq(&self, other: &Self) -> bool {
-		self.cmp(other).is_eq()
-	}
-}
-
-impl Eq for FourOfAKind {}
-
-//
-
 impl Ord for StraightFlush {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
 		cmp_straight(&self.straight_flush, &other.straight_flush)
 	}
 }
-
-impl PartialOrd for StraightFlush {
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		Some(self.cmp(other))
-	}
-}
-
-impl PartialEq for StraightFlush {
-	fn eq(&self, other: &Self) -> bool {
-		self.cmp(other).is_eq()
-	}
-}
-
-impl Eq for StraightFlush {}
-
-//
 
 impl Ord for RoyalFlush {
 	fn cmp(&self, _: &Self) -> std::cmp::Ordering {
@@ -227,21 +81,18 @@ impl Ord for RoyalFlush {
 	}
 }
 
-impl PartialOrd for RoyalFlush {
-	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-		Some(self.cmp(other))
-	}
-}
-
-impl PartialEq for RoyalFlush {
-	fn eq(&self, other: &Self) -> bool {
-		self.cmp(other).is_eq()
-	}
-}
-
-impl Eq for RoyalFlush {}
-
-//
+derive_total_ord!(
+	HighCard,
+	Pair,
+	TwoPair,
+	ThreeOfAKind,
+	Straight,
+	Flush,
+	FullHouse,
+	FourOfAKind,
+	StraightFlush,
+	RoyalFlush
+);
 
 trait RankedHand {
 	fn rank(&self) -> u8;
