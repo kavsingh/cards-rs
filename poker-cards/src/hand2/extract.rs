@@ -3,7 +3,7 @@ use thiserror::Error;
 use super::{
 	Hand, HandCandidate, HighCard, Pair, Straight, ThreeOfAKind, TwoPair,
 };
-use crate::hand2::{Flush, FullHouse};
+use crate::hand2::{Flush, FourOfAKind, FullHouse};
 use crate::util::{chunk_by, group_by, without};
 use crate::{Card, Rank};
 
@@ -23,6 +23,8 @@ pub enum ExtractError {
 	NoFlush,
 	#[error("full house not found")]
 	NoFullHouse,
+	#[error("four of a kind not found")]
+	NoFourOfAKind,
 }
 
 fn kickers_from(cards: &[Card], exclude: &[Card]) -> Vec<Card> {
@@ -221,12 +223,36 @@ impl TryFrom<&HandCandidate> for FullHouse {
 	}
 }
 
+impl TryFrom<&HandCandidate> for FourOfAKind {
+	type Error = ExtractError;
+
+	#[allow(clippy::many_single_char_names)]
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		let grouped = group_by(&candidate.sorted_cards, |c| c.rank);
+		let quadruplets = grouped
+			.iter()
+			.filter(|(_, cards)| cards.len() >= 4)
+			.collect::<Vec<_>>();
+
+		let quad = match quadruplets.first().map(|(_, q)| &q[..]) {
+			Some([a, b, c, d, ..]) => [*a, *b, *c, *d],
+			_ => Err(ExtractError::NoFourOfAKind)?,
+		};
+
+		Ok(Self {
+			quad,
+			kickers: kickers_from(&candidate.sorted_cards, &quad),
+		})
+	}
+}
+
 impl TryFrom<&HandCandidate> for Hand {
 	type Error = ExtractError;
 
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		FullHouse::try_from(candidate)
-			.map(Self::FullHouse)
+		FourOfAKind::try_from(candidate)
+			.map(Self::FourOfAKind)
+			.or_else(|_| FullHouse::try_from(candidate).map(Self::FullHouse))
 			.or_else(|_| Flush::try_from(candidate).map(Self::Flush))
 			.or_else(|_| Straight::try_from(candidate).map(Self::Straight))
 			.or_else(|_| {
@@ -505,6 +531,33 @@ mod tests {
 			assert_eq!(&hand.pair[1].to_string(), "3h");
 		} else {
 			panic!("Expected FullHouse hand");
+		}
+	}
+
+	#[test]
+	fn should_extract_four_of_a_kind() {
+		let pocket_cards = [
+			Card::new(Rank::Jack, Suit::Diamonds),
+			Card::new(Rank::Six, Suit::Diamonds),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Six, Suit::Hearts),
+			Card::new(Rank::Six, Suit::Spades),
+			Card::new(Rank::Queen, Suit::Clubs),
+			Card::new(Rank::Eight, Suit::Spades),
+			Card::new(Rank::Six, Suit::Clubs),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::FourOfAKind(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.quad[0].to_string(), "6d");
+			assert_eq!(&hand.quad[1].to_string(), "6h");
+			assert_eq!(&hand.quad[2].to_string(), "6s");
+			assert_eq!(&hand.quad[3].to_string(), "6c");
+			assert_eq!(&hand.kickers.first().unwrap().to_string(), "Qc");
+		} else {
+			panic!("Expected FourOfAKind hand");
 		}
 	}
 }
