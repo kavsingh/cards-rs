@@ -1,4 +1,5 @@
 use super::{Hand, HighCard, Pair, Straight, ThreeOfAKind, TwoPair};
+use crate::hand2::Flush;
 use crate::util::cmp_max;
 use crate::{Card, Rank};
 
@@ -128,6 +129,28 @@ impl Eq for Straight {}
 
 //
 
+impl Ord for Flush {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		cmp_max(&self.flush, &other.flush)
+	}
+}
+
+impl PartialOrd for Flush {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl PartialEq for Flush {
+	fn eq(&self, other: &Self) -> bool {
+		self.cmp(other).is_eq()
+	}
+}
+
+impl Eq for Flush {}
+
+//
+
 trait RankedHand {
 	fn rank(&self) -> u8;
 }
@@ -185,59 +208,49 @@ impl Eq for Hand {}
 mod tests {
 	use super::{Hand, HighCard, Straight, TwoPair};
 
+	fn c(s: &str) -> super::Card {
+		s.parse().unwrap()
+	}
+
 	#[test]
 	#[allow(clippy::too_many_lines)]
 	fn should_compare_hands() {
 		let high_king_10_kicker = Hand::HighCard(HighCard {
-			high_card: "Kd".parse().unwrap(),
-			kickers: vec!["10c".parse().unwrap()],
+			high_card: c("Kd"),
+			kickers: vec![c("10c")],
 		});
 
 		let high_king_6_kicker = Hand::HighCard(HighCard {
-			high_card: "Kc".parse().unwrap(),
-			kickers: vec!["6d".parse().unwrap()],
+			high_card: c("Kc"),
+			kickers: vec![c("6d")],
 		});
 
 		let two_pair_jack_sixes = Hand::TwoPair(TwoPair {
-			high_pair: ["Jd".parse().unwrap(), "Jc".parse().unwrap()],
-			low_pair: ["6d".parse().unwrap(), "6c".parse().unwrap()],
+			high_pair: [c("Jd"), c("Jc")],
+			low_pair: [c("6d"), c("6c")],
 			kickers: vec![],
 		});
 
 		let two_pair_jack_fives = Hand::TwoPair(TwoPair {
-			high_pair: ["Jd".parse().unwrap(), "Jc".parse().unwrap()],
-			low_pair: ["5d".parse().unwrap(), "5c".parse().unwrap()],
+			high_pair: [c("Jd"), c("Jc")],
+			low_pair: [c("5d"), c("5c")],
 			kickers: vec![],
 		});
 
 		let straight_no_ace = Hand::Straight(Straight {
-			straight: [
-				"6h".parse().unwrap(),
-				"5d".parse().unwrap(),
-				"4c".parse().unwrap(),
-				"3d".parse().unwrap(),
-				"2s".parse().unwrap(),
-			],
+			straight: [c("6h"), c("5d"), c("4c"), c("3d"), c("2s")],
 		});
 
 		let straight_ace_low = Hand::Straight(Straight {
-			straight: [
-				"5d".parse().unwrap(),
-				"4c".parse().unwrap(),
-				"3d".parse().unwrap(),
-				"2h".parse().unwrap(),
-				"Ad".parse().unwrap(),
-			],
+			straight: [c("5d"), c("4c"), c("3d"), c("2h"), c("Ad")],
 		});
 
 		let straight_ace_high = Hand::Straight(Straight {
-			straight: [
-				"Ad".parse().unwrap(),
-				"Kc".parse().unwrap(),
-				"Qh".parse().unwrap(),
-				"Jd".parse().unwrap(),
-				"10s".parse().unwrap(),
-			],
+			straight: [c("Ad"), c("Kc"), c("Qh"), c("Jd"), c("10s")],
+		});
+
+		let flush = Hand::Flush(super::Flush {
+			flush: [c("Ad"), c("Kd"), c("Qd"), c("Jd"), c("10d")],
 		});
 
 		let mut hands = [
@@ -246,6 +259,7 @@ mod tests {
 			&straight_ace_low,
 			&high_king_10_kicker,
 			&two_pair_jack_fives,
+			&flush,
 			&straight_no_ace,
 			&high_king_6_kicker,
 		];
@@ -261,6 +275,7 @@ mod tests {
 				&straight_ace_low,
 				&straight_no_ace,
 				&straight_ace_high,
+				&flush
 			],
 			hands,
 		);
