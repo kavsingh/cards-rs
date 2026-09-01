@@ -3,7 +3,7 @@ use thiserror::Error;
 use super::{
 	Hand, HandCandidate, HighCard, Pair, Straight, ThreeOfAKind, TwoPair,
 };
-use crate::hand2::Flush;
+use crate::hand2::{Flush, FullHouse};
 use crate::util::{chunk_by, group_by, without};
 use crate::{Card, Rank};
 
@@ -21,6 +21,8 @@ pub enum ExtractError {
 	NoStraight,
 	#[error("flush not found")]
 	NoFlush,
+	#[error("full house not found")]
+	NoFullHouse,
 }
 
 fn kickers_from(cards: &[Card], exclude: &[Card]) -> Vec<Card> {
@@ -54,20 +56,24 @@ impl TryFrom<&HandCandidate> for HighCard {
 	}
 }
 
+fn try_pair_from(sorted_cards: &[Card]) -> Result<[Card; 2], ExtractError> {
+	let grouped = group_by(sorted_cards, |c| c.rank);
+	let pairs = grouped
+		.iter()
+		.filter(|(_, cards)| cards.len() >= 2)
+		.collect::<Vec<_>>();
+
+	match pairs.first().map(|(_, p)| &p[..]) {
+		Some([a, b, ..]) => Ok([*a, *b]),
+		_ => Err(ExtractError::NoPair),
+	}
+}
+
 impl TryFrom<&HandCandidate> for Pair {
 	type Error = ExtractError;
 
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		let grouped = group_by(&candidate.sorted_cards, |c| c.rank);
-		let pairs = grouped
-			.iter()
-			.filter(|(_, cards)| cards.len() == 2)
-			.collect::<Vec<_>>();
-
-		let pair = match pairs.first().map(|(_, p)| &p[..]) {
-			Some([a, b]) => [*a, *b],
-			_ => return Err(Self::Error::NoPair),
-		};
+		let pair = try_pair_from(&candidate.sorted_cards)?;
 
 		Ok(Self {
 			pair,
@@ -105,20 +111,24 @@ impl TryFrom<&HandCandidate> for TwoPair {
 	}
 }
 
+fn try_triplet_from(sorted_cards: &[Card]) -> Result<[Card; 3], ExtractError> {
+	let grouped = group_by(sorted_cards, |c| c.rank);
+	let triplets = grouped
+		.iter()
+		.filter(|(_, cards)| cards.len() >= 3)
+		.collect::<Vec<_>>();
+
+	match triplets.first().map(|(_, t)| &t[..]) {
+		Some([a, b, c, ..]) => Ok([*a, *b, *c]),
+		_ => Err(ExtractError::NoThreeOfAKind),
+	}
+}
+
 impl TryFrom<&HandCandidate> for ThreeOfAKind {
 	type Error = ExtractError;
 
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		let grouped = group_by(&candidate.sorted_cards, |c| c.rank);
-		let triplets = grouped
-			.iter()
-			.filter(|(_, cards)| cards.len() == 3)
-			.collect::<Vec<_>>();
-
-		let triplet = match triplets.first().map(|(_, t)| &t[..]) {
-			Some([a, b, c]) => [*a, *b, *c],
-			_ => return Err(Self::Error::NoThreeOfAKind),
-		};
+		let triplet = try_triplet_from(&candidate.sorted_cards)?;
 
 		Ok(Self {
 			triplet,
@@ -134,10 +144,10 @@ fn try_straight_from(
 	let candidate_straight: Vec<_> =
 		chunk_by(&candidate.sorted_cards, |a, b| a.rank_diff(b) == 1)
 			.into_iter()
-			.find(|chunk| chunk.len() == 4 || chunk.len() == 5)
+			.find(|chunk| chunk.len() >= 4)
 			.ok_or(ExtractError::NoStraight)?;
 
-	if let [a, b, c, d, e] = &candidate_straight[..] {
+	if let [a, b, c, d, e, ..] = &candidate_straight[..] {
 		return Ok([*a, *b, *c, *d, *e]);
 	}
 
@@ -197,12 +207,27 @@ impl TryFrom<&HandCandidate> for Flush {
 	}
 }
 
+impl TryFrom<&HandCandidate> for FullHouse {
+	type Error = ExtractError;
+
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		let triplet = try_triplet_from(&candidate.sorted_cards)
+			.map_err(|_| ExtractError::NoFullHouse)?;
+		let remaining_cards = without(&triplet, &candidate.sorted_cards);
+		let pair = try_pair_from(&remaining_cards)
+			.map_err(|_| ExtractError::NoFullHouse)?;
+
+		Ok(Self { triplet, pair })
+	}
+}
+
 impl TryFrom<&HandCandidate> for Hand {
 	type Error = ExtractError;
 
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		Flush::try_from(candidate)
-			.map(Self::Flush)
+		FullHouse::try_from(candidate)
+			.map(Self::FullHouse)
+			.or_else(|_| Flush::try_from(candidate).map(Self::Flush))
 			.or_else(|_| Straight::try_from(candidate).map(Self::Straight))
 			.or_else(|_| {
 				ThreeOfAKind::try_from(candidate).map(Self::ThreeOfAKind)
@@ -236,7 +261,7 @@ mod tests {
 		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
 
 		if let Ok(Hand::HighCard(hand)) = Hand::try_from(&candidate) {
-			assert_eq!(hand.high_card.rank, Rank::Ace);
+			assert_eq!(&hand.high_card.to_string(), "Ah");
 			assert_eq!(hand.kickers.len(), 4);
 		} else {
 			panic!("Expected HighCard hand");
@@ -260,8 +285,8 @@ mod tests {
 		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
 
 		if let Ok(Hand::Pair(hand)) = Hand::try_from(&candidate) {
-			assert_eq!(hand.pair[0].rank, Rank::Ace);
-			assert_eq!(hand.pair[1].rank, Rank::Ace);
+			assert_eq!(&hand.pair[0].to_string(), "Ah");
+			assert_eq!(hand.pair[1].to_string(), "Ad");
 			assert_eq!(hand.kickers.len(), 3);
 		} else {
 			panic!("Expected Pair hand");
@@ -285,10 +310,10 @@ mod tests {
 		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
 
 		if let Ok(Hand::TwoPair(hand)) = Hand::try_from(&candidate) {
-			assert_eq!(hand.high_pair[0].rank, Rank::Ace);
-			assert_eq!(hand.high_pair[1].rank, Rank::Ace);
-			assert_eq!(hand.low_pair[0].rank, Rank::Ten);
-			assert_eq!(hand.low_pair[1].rank, Rank::Ten);
+			assert_eq!(&hand.high_pair[0].to_string(), "Ah");
+			assert_eq!(&hand.high_pair[1].to_string(), "Ad");
+			assert_eq!(&hand.low_pair[0].to_string(), "10d");
+			assert_eq!(&hand.low_pair[1].to_string(), "10h");
 			assert_eq!(hand.kickers.len(), 1);
 		} else {
 			panic!("Expected TwoPair hand");
@@ -304,7 +329,7 @@ mod tests {
 		let community_cards = [
 			Card::new(Rank::Two, Suit::Clubs),
 			Card::new(Rank::Eight, Suit::Spades),
-			Card::new(Rank::Ten, Suit::Hearts),
+			Card::new(Rank::Five, Suit::Hearts),
 			Card::new(Rank::Ace, Suit::Diamonds),
 			Card::new(Rank::Ace, Suit::Clubs),
 		];
@@ -312,9 +337,9 @@ mod tests {
 		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
 
 		if let Ok(Hand::ThreeOfAKind(hand)) = Hand::try_from(&candidate) {
-			assert_eq!(hand.triplet[0].rank, Rank::Ace);
-			assert_eq!(hand.triplet[1].rank, Rank::Ace);
-			assert_eq!(hand.triplet[2].rank, Rank::Ace);
+			assert_eq!(&hand.triplet[0].to_string(), "Ah");
+			assert_eq!(&hand.triplet[1].to_string(), "Ad");
+			assert_eq!(&hand.triplet[2].to_string(), "Ac");
 			assert_eq!(hand.kickers.len(), 2);
 		} else {
 			panic!("Expected ThreeOfAKind hand");
@@ -338,11 +363,11 @@ mod tests {
 		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
 
 		if let Ok(Hand::Straight(hand)) = Hand::try_from(&candidate) {
-			assert_eq!(hand.straight[0].rank, Rank::Six);
-			assert_eq!(hand.straight[1].rank, Rank::Five);
-			assert_eq!(hand.straight[2].rank, Rank::Four);
-			assert_eq!(hand.straight[3].rank, Rank::Three);
-			assert_eq!(hand.straight[4].rank, Rank::Two);
+			assert_eq!(&hand.straight[0].to_string(), "6c");
+			assert_eq!(&hand.straight[1].to_string(), "5d");
+			assert_eq!(&hand.straight[2].to_string(), "4h");
+			assert_eq!(&hand.straight[3].to_string(), "3s");
+			assert_eq!(&hand.straight[4].to_string(), "2c");
 		} else {
 			panic!("Expected Straight hand");
 		}
@@ -365,11 +390,11 @@ mod tests {
 		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
 
 		if let Ok(Hand::Straight(hand)) = Hand::try_from(&candidate) {
-			assert_eq!(hand.straight[0].rank, Rank::Five);
-			assert_eq!(hand.straight[1].rank, Rank::Four);
-			assert_eq!(hand.straight[2].rank, Rank::Three);
-			assert_eq!(hand.straight[3].rank, Rank::Two);
-			assert_eq!(hand.straight[4].rank, Rank::Ace);
+			assert_eq!(&hand.straight[0].to_string(), "5d");
+			assert_eq!(&hand.straight[1].to_string(), "4h");
+			assert_eq!(&hand.straight[2].to_string(), "3s");
+			assert_eq!(&hand.straight[3].to_string(), "2c");
+			assert_eq!(&hand.straight[4].to_string(), "Ah");
 		} else {
 			panic!("Expected Straight hand");
 		}
@@ -399,6 +424,87 @@ mod tests {
 			assert_eq!(&hand.flush[4].to_string(), "2d");
 		} else {
 			panic!("Expected Flush hand");
+		}
+	}
+
+	#[test]
+	fn should_extract_full_house() {
+		let pocket_cards = [
+			Card::new(Rank::Three, Suit::Spades),
+			Card::new(Rank::Four, Suit::Diamonds),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Three, Suit::Clubs),
+			Card::new(Rank::Three, Suit::Diamonds),
+			Card::new(Rank::Five, Suit::Diamonds),
+			Card::new(Rank::Jack, Suit::Diamonds),
+			Card::new(Rank::Jack, Suit::Hearts),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::FullHouse(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.triplet[0].to_string(), "3s");
+			assert_eq!(&hand.triplet[1].to_string(), "3c");
+			assert_eq!(&hand.triplet[2].to_string(), "3d");
+			assert_eq!(&hand.pair[0].to_string(), "Jd");
+			assert_eq!(&hand.pair[1].to_string(), "Jh");
+		} else {
+			panic!("Expected FullHouse hand");
+		}
+	}
+
+	#[test]
+	fn should_extract_full_house_with_highest_pair() {
+		let pocket_cards = [
+			Card::new(Rank::Four, Suit::Diamonds),
+			Card::new(Rank::Jack, Suit::Hearts),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Four, Suit::Hearts),
+			Card::new(Rank::Three, Suit::Clubs),
+			Card::new(Rank::Three, Suit::Diamonds),
+			Card::new(Rank::Jack, Suit::Spades),
+			Card::new(Rank::Jack, Suit::Diamonds),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::FullHouse(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.triplet[0].to_string(), "Jh");
+			assert_eq!(&hand.triplet[1].to_string(), "Js");
+			assert_eq!(&hand.triplet[2].to_string(), "Jd");
+			assert_eq!(&hand.pair[0].to_string(), "4d");
+			assert_eq!(&hand.pair[1].to_string(), "4h");
+		} else {
+			panic!("Expected FullHouse hand");
+		}
+	}
+
+	#[test]
+	fn should_extract_full_house_with_highest_triplet() {
+		let pocket_cards = [
+			Card::new(Rank::Four, Suit::Diamonds),
+			Card::new(Rank::Three, Suit::Clubs),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Three, Suit::Hearts),
+			Card::new(Rank::Three, Suit::Diamonds),
+			Card::new(Rank::Jack, Suit::Spades),
+			Card::new(Rank::Jack, Suit::Diamonds),
+			Card::new(Rank::Jack, Suit::Hearts),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::FullHouse(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.triplet[0].to_string(), "Js");
+			assert_eq!(&hand.triplet[1].to_string(), "Jd");
+			assert_eq!(&hand.triplet[2].to_string(), "Jh");
+			assert_eq!(&hand.pair[0].to_string(), "3c");
+			assert_eq!(&hand.pair[1].to_string(), "3h");
+		} else {
+			panic!("Expected FullHouse hand");
 		}
 	}
 }
