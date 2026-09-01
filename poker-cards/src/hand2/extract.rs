@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use super::{
 	Flush, FourOfAKind, FullHouse, Hand, HandCandidate, HighCard, Pair,
-	Straight, StraightFlush, ThreeOfAKind, TwoPair,
+	RoyalFlush, Straight, StraightFlush, ThreeOfAKind, TwoPair,
 };
 use crate::util::{chunk_by, group_by, without};
 use crate::{Card, Rank};
@@ -27,6 +27,8 @@ pub enum ExtractError {
 	NoFourOfAKind,
 	#[error("straight flush not found")]
 	NoStraightFlush,
+	#[error("royal flush not found")]
+	NoRoyalFlush,
 }
 
 fn kickers_from(cards: &[Card], exclude: &[Card]) -> Vec<Card> {
@@ -250,12 +252,32 @@ impl TryFrom<&HandCandidate> for StraightFlush {
 	}
 }
 
+impl TryFrom<&HandCandidate> for RoyalFlush {
+	type Error = ExtractError;
+
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		match StraightFlush::try_from(candidate) {
+			Ok(StraightFlush { straight_flush })
+				if straight_flush[0].rank == Rank::Ace =>
+			{
+				Ok(Self {
+					royal_flush: straight_flush,
+				})
+			}
+			_ => Err(ExtractError::NoRoyalFlush),
+		}
+	}
+}
+
 impl TryFrom<&HandCandidate> for Hand {
 	type Error = ExtractError;
 
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		StraightFlush::try_from(candidate)
-			.map(Self::StraightFlush)
+		RoyalFlush::try_from(candidate)
+			.map(Self::RoyalFlush)
+			.or_else(|_| {
+				StraightFlush::try_from(candidate).map(Self::StraightFlush)
+			})
 			.or_else(|_| {
 				FourOfAKind::try_from(candidate).map(Self::FourOfAKind)
 			})
@@ -672,6 +694,33 @@ mod tests {
 			assert_eq!(&hand.flush[4].to_string(), "9d");
 		} else {
 			panic!("Expected Flush hand");
+		}
+	}
+
+	#[test]
+	fn should_extract_royal_flush() {
+		let pocket_cards = [
+			Card::new(Rank::Ace, Suit::Hearts),
+			Card::new(Rank::Jack, Suit::Hearts),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Ten, Suit::Hearts),
+			Card::new(Rank::King, Suit::Hearts),
+			Card::new(Rank::Queen, Suit::Hearts),
+			Card::new(Rank::Three, Suit::Clubs),
+			Card::new(Rank::Four, Suit::Diamonds),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::RoyalFlush(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.royal_flush[0].to_string(), "Ah");
+			assert_eq!(&hand.royal_flush[1].to_string(), "Kh");
+			assert_eq!(&hand.royal_flush[2].to_string(), "Qh");
+			assert_eq!(&hand.royal_flush[3].to_string(), "Jh");
+			assert_eq!(&hand.royal_flush[4].to_string(), "Th");
+		} else {
+			panic!("Expected RoyalFlush hand");
 		}
 	}
 }
