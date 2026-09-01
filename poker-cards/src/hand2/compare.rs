@@ -243,7 +243,7 @@ mod tests {
 	fn should_compare_hands() {
 		let high_king_10_kicker = Hand::HighCard(HighCard {
 			high_card: c("Kd"),
-			kickers: vec![c("10c")],
+			kickers: vec![c("Tc")],
 		});
 
 		let high_king_6_kicker = Hand::HighCard(HighCard {
@@ -272,7 +272,7 @@ mod tests {
 		});
 
 		let straight_ace_high = Hand::Straight(Straight {
-			straight: [c("Ad"), c("Kc"), c("Qh"), c("Jd"), c("10s")],
+			straight: [c("Ad"), c("Kc"), c("Qh"), c("Jd"), c("Ts")],
 		});
 
 		let flush_king_high = Hand::Flush(super::Flush {
@@ -294,7 +294,7 @@ mod tests {
 		});
 
 		let full_house_10_3 = Hand::FullHouse(super::FullHouse {
-			triplet: [c("10d"), c("10c"), c("10h")],
+			triplet: [c("Td"), c("Tc"), c("Th")],
 			pair: [c("3d"), c("3c")],
 		});
 
