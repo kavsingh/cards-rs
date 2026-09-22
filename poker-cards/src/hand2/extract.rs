@@ -86,16 +86,10 @@ impl TryFrom<&HandCandidate> for HighCard {
 			.sorted_cards
 			.first()
 			.ok_or(Self::Error::NotEnoughCards)?;
-		let kicker_cards = candidate
-			.sorted_cards
-			.get(1..5)
-			.unwrap_or_default()
-			.to_vec();
+		let kicker_cards =
+			candidate.sorted_cards.get(1..5).unwrap_or_default().to_vec();
 
-		Ok(Self {
-			high_card: high_card.to_owned(),
-			kickers: kicker_cards,
-		})
+		Ok(Self { high_card: high_card.to_owned(), kickers: kicker_cards })
 	}
 }
 
@@ -106,10 +100,7 @@ impl TryFrom<&HandCandidate> for Pair {
 		let pair = get_n_by::<_, _, 2>(&candidate.sorted_cards, |c| c.rank)
 			.ok_or(Self::Error::NoPair)?;
 
-		Ok(Self {
-			pair,
-			kickers: kickers_from(&candidate.sorted_cards, &pair),
-		})
+		Ok(Self { pair, kickers: kickers_from(&candidate.sorted_cards, &pair) })
 	}
 }
 
@@ -160,9 +151,7 @@ impl TryFrom<&HandCandidate> for Straight {
 	type Error = ExtractError;
 
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		Ok(Self {
-			straight: try_straight_from(&candidate.sorted_cards)?,
-		})
+		Ok(Self { straight: try_straight_from(&candidate.sorted_cards)? })
 	}
 }
 
@@ -202,10 +191,7 @@ impl TryFrom<&HandCandidate> for FourOfAKind {
 		let quad = get_n_by::<_, _, 4>(&candidate.sorted_cards, |c| c.rank)
 			.ok_or(ExtractError::NoFourOfAKind)?;
 
-		Ok(Self {
-			quad,
-			kickers: kickers_from(&candidate.sorted_cards, &quad),
-		})
+		Ok(Self { quad, kickers: kickers_from(&candidate.sorted_cards, &quad) })
 	}
 }
 
@@ -266,7 +252,7 @@ impl TryFrom<&HandCandidate> for Hand {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::panic)]
 mod tests {
-	use super::{Hand, HandCandidate};
+	use super::*;
 	use crate::{Card, Rank, Suit};
 
 	#[test]
