@@ -8,4 +8,6 @@ pub use cards::{Rank, Suit, create_deck};
 
 pub use crate::card::Card;
 pub use crate::hand::{Hand, HandCandidate, HandRank};
-pub use crate::hand2::{Hand as Hand2, HandCandidate as HandCandidate2};
+pub use crate::hand2::{
+	Describe, Hand as Hand2, HandCandidate as HandCandidate2,
+};
