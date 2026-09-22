@@ -1,13 +1,9 @@
 mod card;
 mod hand;
-mod hand2;
 mod macros;
 mod util;
 
 pub use cards::{Rank, Suit, create_deck};
 
 pub use crate::card::Card;
-pub use crate::hand::{Hand, HandCandidate, HandRank};
-pub use crate::hand2::{
-	Describe, Hand as Hand2, HandCandidate as HandCandidate2,
-};
+pub use crate::hand::{Describe, Hand, HandCandidate, RankedHand};
