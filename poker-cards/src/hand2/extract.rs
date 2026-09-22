@@ -270,7 +270,7 @@ mod tests {
 	use crate::{Card, Rank, Suit};
 
 	#[test]
-	fn should_extract_high_card() {
+	fn high_card() {
 		let pocket_cards = [
 			Card::new(Rank::Ace, Suit::Hearts),
 			Card::new(Rank::Ten, Suit::Diamonds),
@@ -294,7 +294,7 @@ mod tests {
 	}
 
 	#[test]
-	fn should_extract_pair() {
+	fn pair() {
 		let pocket_cards = [
 			Card::new(Rank::Ace, Suit::Hearts),
 			Card::new(Rank::Ten, Suit::Diamonds),
@@ -319,7 +319,7 @@ mod tests {
 	}
 
 	#[test]
-	fn should_extract_two_pair() {
+	fn two_pair() {
 		let pocket_cards = [
 			Card::new(Rank::Ace, Suit::Hearts),
 			Card::new(Rank::Ten, Suit::Diamonds),
@@ -346,7 +346,7 @@ mod tests {
 	}
 
 	#[test]
-	fn should_extract_three_of_a_kind() {
+	fn three_of_a_kind() {
 		let pocket_cards = [
 			Card::new(Rank::Ace, Suit::Hearts),
 			Card::new(Rank::Ten, Suit::Diamonds),
@@ -372,7 +372,7 @@ mod tests {
 	}
 
 	#[test]
-	fn should_extract_straight() {
+	fn straight() {
 		let pocket_cards = [
 			Card::new(Rank::Ace, Suit::Hearts),
 			Card::new(Rank::Ten, Suit::Diamonds),
@@ -399,7 +399,7 @@ mod tests {
 	}
 
 	#[test]
-	fn should_extract_straight_with_ace_low() {
+	fn straight_with_ace_low() {
 		let pocket_cards = [
 			Card::new(Rank::Ace, Suit::Hearts),
 			Card::new(Rank::Ten, Suit::Diamonds),
@@ -426,7 +426,7 @@ mod tests {
 	}
 
 	#[test]
-	fn should_extract_flush() {
+	fn flush() {
 		let pocket_cards = [
 			Card::new(Rank::Three, Suit::Diamonds),
 			Card::new(Rank::Jack, Suit::Diamonds),
@@ -453,7 +453,7 @@ mod tests {
 	}
 
 	#[test]
-	fn should_extract_full_house() {
+	fn full_house() {
 		let pocket_cards = [
 			Card::new(Rank::Three, Suit::Spades),
 			Card::new(Rank::Four, Suit::Diamonds),
@@ -480,7 +480,7 @@ mod tests {
 	}
 
 	#[test]
-	fn should_extract_full_house_with_highest_pair() {
+	fn full_house_with_highest_pair() {
 		let pocket_cards = [
 			Card::new(Rank::Four, Suit::Diamonds),
 			Card::new(Rank::Jack, Suit::Hearts),
@@ -507,7 +507,7 @@ mod tests {
 	}
 
 	#[test]
-	fn should_extract_full_house_with_highest_triplet() {
+	fn full_house_with_highest_triplet() {
 		let pocket_cards = [
 			Card::new(Rank::Four, Suit::Diamonds),
 			Card::new(Rank::Three, Suit::Clubs),
@@ -534,7 +534,7 @@ mod tests {
 	}
 
 	#[test]
-	fn should_extract_four_of_a_kind() {
+	fn four_of_a_kind() {
 		let pocket_cards = [
 			Card::new(Rank::Jack, Suit::Diamonds),
 			Card::new(Rank::Six, Suit::Diamonds),
@@ -561,7 +561,7 @@ mod tests {
 	}
 
 	#[test]
-	fn should_extract_straight_flush() {
+	fn straight_flush() {
 		let pocket_cards = [
 			Card::new(Rank::Two, Suit::Clubs),
 			Card::new(Rank::Six, Suit::Clubs),
@@ -588,7 +588,7 @@ mod tests {
 	}
 
 	#[test]
-	fn should_extract_straight_flush_ace_low() {
+	fn straight_flush_ace_low() {
 		let pocket_cards = [
 			Card::new(Rank::Ace, Suit::Spades),
 			Card::new(Rank::Eight, Suit::Hearts),
@@ -615,7 +615,7 @@ mod tests {
 	}
 
 	#[test]
-	fn should_not_extract_straight_flush_offsuit_ace() {
+	fn ignores_straight_flush_with_offsuit_ace() {
 		let pocket_cards = [
 			Card::new(Rank::Ace, Suit::Clubs),
 			Card::new(Rank::Two, Suit::Spades),
@@ -641,7 +641,7 @@ mod tests {
 	}
 
 	#[test]
-	fn should_not_extract_straight_flush_ambiguous_ace() {
+	fn ignores_straight_flush_with_ambiguous_ace() {
 		let pocket_cards = [
 			Card::new(Rank::Ace, Suit::Diamonds),
 			Card::new(Rank::Five, Suit::Diamonds),
@@ -668,7 +668,7 @@ mod tests {
 	}
 
 	#[test]
-	fn should_extract_royal_flush() {
+	fn royal_flush() {
 		let pocket_cards = [
 			Card::new(Rank::Ace, Suit::Hearts),
 			Card::new(Rank::Jack, Suit::Hearts),

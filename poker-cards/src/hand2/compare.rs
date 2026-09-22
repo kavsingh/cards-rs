@@ -160,7 +160,7 @@ mod tests {
 
 	#[test]
 	#[allow(clippy::too_many_lines)]
-	fn should_compare_hands() {
+	fn hands() {
 		let high_king_10_kicker = super::Hand::HighCard(super::HighCard {
 			high_card: c("Kd"),
 			kickers: vec![c("Tc")],
