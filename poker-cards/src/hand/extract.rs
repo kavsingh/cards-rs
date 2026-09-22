@@ -1,772 +1,682 @@
-use super::{Hand, HandCandidate, HandRank};
-use crate::util::{chunk_by, group_by, without};
+use thiserror::Error;
+
+use super::{
+	Flush, FourOfAKind, FullHouse, Hand, HandCandidate, HighCard, Pair,
+	RoyalFlush, Straight, StraightFlush, ThreeOfAKind, TwoPair,
+};
+use crate::util::{chunk_by, get_n_by, group_by, without};
 use crate::{Card, Rank};
 
-const MAX_KICKER_CARDS: usize = 5;
-
-fn to_hand(rank: HandRank, rank_cards: Vec<Card>, sorted: &[Card]) -> Hand {
-	let kicker_cards = without(&rank_cards, sorted)
-		.into_iter()
-		.take(MAX_KICKER_CARDS.saturating_sub(rank_cards.len()))
-		.collect();
-
-	Hand { rank, rank_cards, kicker_cards }
+#[derive(Debug, Error, PartialEq, Eq, Copy, Clone)]
+pub enum ExtractError {
+	#[error("not enough cards to extract a hand")]
+	NotEnoughCards,
+	#[error("pair not found")]
+	NoPair,
+	#[error("two pair not found")]
+	NoTwoPair,
+	#[error("three of a kind not found")]
+	NoThreeOfAKind,
+	#[error("straight not found")]
+	NoStraight,
+	#[error("flush not found")]
+	NoFlush,
+	#[error("full house not found")]
+	NoFullHouse,
+	#[error("four of a kind not found")]
+	NoFourOfAKind,
+	#[error("straight flush not found")]
+	NoStraightFlush,
+	#[error("royal flush not found")]
+	NoRoyalFlush,
 }
 
-type Extractor = fn(&[Card]) -> Option<Hand>;
-const ORDERED_EXTRACTORS: [Extractor; 9] = [
-	extract_royal_flush,
-	extract_straight_flush,
-	extract_four_of_a_kind,
-	extract_full_house,
-	extract_flush,
-	extract_straight,
-	extract_three_of_a_kind,
-	extract_two_pair,
-	extract_pair,
-];
+fn kickers_from(cards: &[Card], exclude: &[Card]) -> Vec<Card> {
+	let max: usize = 5;
 
-fn extract_royal_flush(sorted: &[Card]) -> Option<Hand> {
-	extract_straight_flush(sorted).and_then(|hand| {
-		match hand.rank_cards.first() {
-			Some(highest) if highest.rank == Rank::Ace => {
-				Some(Hand { rank: HandRank::RoyalFlush, ..hand })
-			}
-			_ => None,
-		}
-	})
-}
-
-fn extract_straight_flush(sorted: &[Card]) -> Option<Hand> {
-	let suit_sorted = group_by(sorted, |c| c.suit)
-		.into_iter()
-		.find(|(_, cards)| cards.len() >= 5)
-		.map(|(_, cards)| cards)?;
-
-	extract_straight(&suit_sorted)
-		.map(|hand| Hand { rank: HandRank::StraightFlush, ..hand })
-}
-
-fn extract_four_of_a_kind(sorted: &[Card]) -> Option<Hand> {
-	group_by(sorted, |c| c.rank)
+	without(exclude, cards)
 		.iter()
-		.find(|(_, cards)| cards.len() == 4)
-		.map(|(_, cards)| to_hand(HandRank::FourOfAKind, cards.clone(), sorted))
+		.take(max.saturating_sub(exclude.len()))
+		.copied()
+		.collect()
 }
 
-fn extract_full_house(sorted: &[Card]) -> Option<Hand> {
-	let three_of_a_kind = extract_three_of_a_kind(sorted)?;
-	let pair_cards = without(&three_of_a_kind.rank_cards, sorted);
-	let pair = extract_pair(&pair_cards)?;
+#[allow(clippy::many_single_char_names)]
+fn try_straight_from(sorted_cards: &[Card]) -> Result<[Card; 5], ExtractError> {
+	let candidate_straight: Vec<_> =
+		chunk_by(sorted_cards, |a, b| a.rank_diff(b) == 1)
+			.into_iter()
+			.find(|chunk| chunk.len() >= 4)
+			.ok_or(ExtractError::NoStraight)?;
 
-	Some(to_hand(
-		HandRank::FullHouse,
-		three_of_a_kind.rank_cards.into_iter().chain(pair.rank_cards).collect(),
-		sorted,
-	))
-}
-
-fn extract_flush(sorted: &[Card]) -> Option<Hand> {
-	let flush = group_by(sorted, |c| c.suit)
-		.into_iter()
-		.find(|(_, cards)| cards.len() >= 5)
-		.map(|(_, cards)| cards.into_iter().take(5).collect())?;
-
-	Some(to_hand(HandRank::Flush, flush, sorted))
-}
-
-fn extract_straight(sorted: &[Card]) -> Option<Hand> {
-	let candidate: Vec<_> = chunk_by(sorted, |a, b| a.rank_diff(b) == 1)
-		.into_iter()
-		.find(|chunk| chunk.len() >= 4)
-		.map(|chunk| chunk.into_iter().take(5).collect())?;
-
-	if candidate.len() == 5 {
-		return Some(to_hand(HandRank::Straight, candidate, sorted));
+	if let [a, b, c, d, e, ..] = &candidate_straight[..] {
+		return Ok([*a, *b, *c, *d, *e]);
 	}
 
-	// if we have a 4 card candidate, we need to check if we can use an ace as
+	// if we have a 4 card candidate, check if we can use an ace as
 	// the low card to complete the straight
 
-	let ace = sorted.iter().find(|c| c.rank == Rank::Ace)?;
-	let lowest = candidate.last()?;
-
-	if lowest.rank == Rank::Two {
-		let straight = candidate
-			.into_iter()
-			.chain(std::iter::once(*ace))
-			.collect::<Vec<_>>();
-
-		return Some(to_hand(HandRank::Straight, straight, sorted));
+	if let Some(lowest) = candidate_straight.last()
+		&& lowest.rank != Rank::Two
+	{
+		return Err(ExtractError::NoStraight);
 	}
 
-	None
-}
-
-fn extract_three_of_a_kind(sorted: &[Card]) -> Option<Hand> {
-	group_by(sorted, |c| c.rank).iter().find(|(_, cards)| cards.len() == 3).map(
-		|(_, cards)| to_hand(HandRank::ThreeOfAKind, cards.clone(), sorted),
-	)
-}
-
-fn extract_two_pair(sorted: &[Card]) -> Option<Hand> {
-	let grouped = group_by(sorted, |c| c.rank);
-	let pairs_only = grouped
+	let ace = sorted_cards
 		.iter()
-		.filter(|(_, cards)| cards.len() >= 2)
+		.find(|c| c.rank == Rank::Ace)
+		.ok_or(ExtractError::NoStraight)?;
+
+	let straight = candidate_straight
+		.into_iter()
+		.chain(std::iter::once(*ace))
 		.collect::<Vec<_>>();
 
-	let (_, first_cards) = pairs_only.first()?;
-	let (_, second_cards) = pairs_only.get(1)?;
+	match &straight[..] {
+		[a, b, c, d, e] => Ok([*a, *b, *c, *d, *e]),
+		_ => Err(ExtractError::NoStraight),
+	}
+}
 
-	Some(to_hand(
-		HandRank::TwoPair,
-		first_cards
+impl TryFrom<&HandCandidate> for HighCard {
+	type Error = ExtractError;
+
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		let high_card = candidate
+			.sorted_cards
+			.first()
+			.ok_or(Self::Error::NotEnoughCards)?;
+		let kicker_cards =
+			candidate.sorted_cards.get(1..5).unwrap_or_default().to_vec();
+
+		Ok(Self { high_card: high_card.to_owned(), kickers: kicker_cards })
+	}
+}
+
+impl TryFrom<&HandCandidate> for Pair {
+	type Error = ExtractError;
+
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		let pair = get_n_by::<_, _, 2>(&candidate.sorted_cards, |c| c.rank)
+			.ok_or(Self::Error::NoPair)?;
+
+		Ok(Self { pair, kickers: kickers_from(&candidate.sorted_cards, &pair) })
+	}
+}
+
+impl TryFrom<&HandCandidate> for TwoPair {
+	type Error = ExtractError;
+
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		let grouped = group_by(&candidate.sorted_cards, |c| c.rank);
+		let pairs = grouped
 			.iter()
-			.copied()
-			.chain(second_cards.iter().copied())
-			.collect(),
-		sorted,
-	))
+			.filter(|(_, cards)| cards.len() >= 2)
+			.collect::<Vec<_>>();
+
+		let (high_pair, low_pair) = match (
+			pairs.first().map(|(_, p)| &p[..]),
+			pairs.get(1).map(|(_, p)| &p[..]),
+		) {
+			(Some([a, b, ..]), Some([c, d, ..])) => ([*a, *b], [*c, *d]),
+			_ => return Err(Self::Error::NoTwoPair),
+		};
+
+		Ok(Self {
+			high_pair,
+			low_pair,
+			kickers: kickers_from(
+				&candidate.sorted_cards,
+				&[high_pair, low_pair].concat(),
+			),
+		})
+	}
 }
 
-fn extract_pair(sorted: &[Card]) -> Option<Hand> {
-	group_by(sorted, |c| c.rank).iter().find(|(_, cards)| cards.len() >= 2).map(
-		|(_, cards)| {
-			to_hand(
-				HandRank::Pair,
-				cards.iter().copied().take(2).collect(),
-				sorted,
-			)
-		},
-	)
+impl TryFrom<&HandCandidate> for ThreeOfAKind {
+	type Error = ExtractError;
+
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		let triplet = get_n_by::<_, _, 3>(&candidate.sorted_cards, |c| c.rank)
+			.ok_or(ExtractError::NoThreeOfAKind)?;
+
+		Ok(Self {
+			triplet,
+			kickers: kickers_from(&candidate.sorted_cards, &triplet),
+		})
+	}
 }
 
-impl From<HandCandidate<'_>> for Hand {
-	fn from(value: HandCandidate) -> Self {
-		let mut community = value.community_cards.to_owned();
-		let mut sorted = value.pocket_cards.to_vec();
+impl TryFrom<&HandCandidate> for Straight {
+	type Error = ExtractError;
 
-		sorted.append(&mut community);
-		sorted.sort_by(|a, b| b.cmp(a));
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		Ok(Self { straight: try_straight_from(&candidate.sorted_cards)? })
+	}
+}
 
-		if let Some(hand) =
-			ORDERED_EXTRACTORS.iter().find_map(|extractor| extractor(&sorted))
-		{
-			return hand;
+impl TryFrom<&HandCandidate> for Flush {
+	type Error = ExtractError;
+
+	#[allow(clippy::many_single_char_names)]
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		Ok(Self {
+			flush: get_n_by::<_, _, 5>(&candidate.sorted_cards, |c| c.suit)
+				.ok_or(ExtractError::NoFlush)?,
+		})
+	}
+}
+
+impl TryFrom<&HandCandidate> for FullHouse {
+	type Error = ExtractError;
+
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		let triplet = get_n_by::<_, _, 3>(&candidate.sorted_cards, |c| c.rank)
+			.ok_or(ExtractError::NoFullHouse)?;
+		let pair = get_n_by::<_, _, 2>(
+			&without(&triplet, &candidate.sorted_cards),
+			|c| c.rank,
+		)
+		.ok_or(ExtractError::NoFullHouse)?;
+
+		Ok(Self { triplet, pair })
+	}
+}
+
+impl TryFrom<&HandCandidate> for FourOfAKind {
+	type Error = ExtractError;
+
+	#[allow(clippy::many_single_char_names)]
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		let quad = get_n_by::<_, _, 4>(&candidate.sorted_cards, |c| c.rank)
+			.ok_or(ExtractError::NoFourOfAKind)?;
+
+		Ok(Self { quad, kickers: kickers_from(&candidate.sorted_cards, &quad) })
+	}
+}
+
+impl TryFrom<&HandCandidate> for StraightFlush {
+	type Error = ExtractError;
+
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		let straight_flush =
+			get_n_by::<_, _, 5>(&candidate.sorted_cards, |c| c.suit)
+				.and_then(|cs| try_straight_from(&cs).ok())
+				.ok_or(ExtractError::NoStraightFlush)?;
+
+		Ok(Self { straight_flush })
+	}
+}
+
+impl TryFrom<&HandCandidate> for RoyalFlush {
+	type Error = ExtractError;
+
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		let straight_flush =
+			get_n_by::<_, _, 5>(&candidate.sorted_cards, |c| c.suit)
+				.and_then(|cs| try_straight_from(&cs).ok());
+
+		match straight_flush {
+			Some(royal_flush) if royal_flush[0].rank == Rank::Ace => {
+				Ok(Self { royal_flush })
+			}
+			_ => Err(ExtractError::NoRoyalFlush),
 		}
+	}
+}
 
-		Self {
-			rank: HandRank::HighCard,
-			rank_cards: sorted.first().map_or_default(|c| vec![*c]),
-			kicker_cards: sorted
-				.get(1..5)
-				.map_or_default(std::borrow::ToOwned::to_owned),
-		}
+impl TryFrom<&HandCandidate> for Hand {
+	type Error = ExtractError;
+
+	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
+		RoyalFlush::try_from(candidate)
+			.map(Self::RoyalFlush)
+			.or_else(|_| {
+				StraightFlush::try_from(candidate).map(Self::StraightFlush)
+			})
+			.or_else(|_| {
+				FourOfAKind::try_from(candidate).map(Self::FourOfAKind)
+			})
+			.or_else(|_| FullHouse::try_from(candidate).map(Self::FullHouse))
+			.or_else(|_| Flush::try_from(candidate).map(Self::Flush))
+			.or_else(|_| Straight::try_from(candidate).map(Self::Straight))
+			.or_else(|_| {
+				ThreeOfAKind::try_from(candidate).map(Self::ThreeOfAKind)
+			})
+			.or_else(|_| TwoPair::try_from(candidate).map(Self::TwoPair))
+			.or_else(|_| Pair::try_from(candidate).map(Self::Pair))
+			.or_else(|_| HighCard::try_from(candidate).map(Self::HighCard))
 	}
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::panic)]
 mod tests {
-	use super::{Hand, HandCandidate, HandRank};
+	use super::*;
 	use crate::{Card, Rank, Suit};
 
 	#[test]
-	fn should_extract_high_card() {
-		assert_eq!(
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Jack, Suit::Clubs),
-					Card::new(Rank::Eight, Suit::Spades),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Six, Suit::Diamonds),
-					Card::new(Rank::Two, Suit::Diamonds),
-					Card::new(Rank::Three, Suit::Clubs),
-					Card::new(Rank::Four, Suit::Clubs),
-					Card::new(Rank::Queen, Suit::Diamonds),
-				],
-			}),
-			Hand {
-				rank: HandRank::HighCard,
-				rank_cards: vec![Card::new(Rank::Queen, Suit::Diamonds)],
-				kicker_cards: vec![
-					Card::new(Rank::Jack, Suit::Clubs),
-					Card::new(Rank::Eight, Suit::Spades),
-					Card::new(Rank::Six, Suit::Diamonds),
-					Card::new(Rank::Four, Suit::Clubs),
-				],
-			}
-		);
+	fn high_card() {
+		let pocket_cards = [
+			Card::new(Rank::Ace, Suit::Hearts),
+			Card::new(Rank::Ten, Suit::Diamonds),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Two, Suit::Clubs),
+			Card::new(Rank::Eight, Suit::Spades),
+			Card::new(Rank::Four, Suit::Hearts),
+			Card::new(Rank::Five, Suit::Diamonds),
+			Card::new(Rank::Six, Suit::Clubs),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::HighCard(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.high_card.to_string(), "Ah");
+			assert_eq!(hand.kickers.len(), 4);
+		} else {
+			panic!("Expected HighCard hand");
+		}
 	}
 
 	#[test]
-	fn should_extract_pair() {
-		let hand = Hand::from(HandCandidate {
-			pocket_cards: &[
-				Card::new(Rank::Six, Suit::Clubs),
-				Card::new(Rank::Two, Suit::Diamonds),
-			],
-			community_cards: &vec![
-				Card::new(Rank::Six, Suit::Diamonds),
-				Card::new(Rank::Jack, Suit::Clubs),
-				Card::new(Rank::Eight, Suit::Spades),
-				Card::new(Rank::Four, Suit::Clubs),
-				Card::new(Rank::Queen, Suit::Diamonds),
-			],
-		});
+	fn pair() {
+		let pocket_cards = [
+			Card::new(Rank::Ace, Suit::Hearts),
+			Card::new(Rank::Ten, Suit::Diamonds),
+		];
+		let community_cards = [
+			Card::new(Rank::Two, Suit::Clubs),
+			Card::new(Rank::Eight, Suit::Spades),
+			Card::new(Rank::Four, Suit::Hearts),
+			Card::new(Rank::Ace, Suit::Diamonds),
+			Card::new(Rank::Six, Suit::Clubs),
+		];
 
-		assert_eq!(hand.rank, HandRank::Pair);
-		assert_eq!(
-			hand.rank_cards,
-			vec![
-				Card::new(Rank::Six, Suit::Clubs),
-				Card::new(Rank::Six, Suit::Diamonds)
-			]
-		);
-		assert_eq!(
-			hand.kicker_cards,
-			vec![
-				Card::new(Rank::Queen, Suit::Diamonds),
-				Card::new(Rank::Jack, Suit::Clubs),
-				Card::new(Rank::Eight, Suit::Spades),
-			]
-		);
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::Pair(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.pair[0].to_string(), "Ah");
+			assert_eq!(hand.pair[1].to_string(), "Ad");
+			assert_eq!(hand.kickers.len(), 3);
+		} else {
+			panic!("Expected Pair hand");
+		}
 	}
 
 	#[test]
-	fn should_extract_two_pair() {
-		assert_eq!(
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Four, Suit::Clubs),
-					Card::new(Rank::Jack, Suit::Diamonds),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Six, Suit::Diamonds),
-					Card::new(Rank::Two, Suit::Diamonds),
-					Card::new(Rank::Eight, Suit::Spades),
-					Card::new(Rank::Six, Suit::Clubs),
-					Card::new(Rank::Jack, Suit::Clubs),
-				],
-			}),
-			Hand {
-				rank: HandRank::TwoPair,
-				rank_cards: vec![
-					Card::new(Rank::Jack, Suit::Diamonds),
-					Card::new(Rank::Jack, Suit::Clubs),
-					Card::new(Rank::Six, Suit::Diamonds),
-					Card::new(Rank::Six, Suit::Clubs),
-				],
-				kicker_cards: vec![Card::new(Rank::Eight, Suit::Spades)],
-			}
-		);
+	fn two_pair() {
+		let pocket_cards = [
+			Card::new(Rank::Ace, Suit::Hearts),
+			Card::new(Rank::Ten, Suit::Diamonds),
+		];
+		let community_cards = [
+			Card::new(Rank::Two, Suit::Clubs),
+			Card::new(Rank::Eight, Suit::Spades),
+			Card::new(Rank::Ten, Suit::Hearts),
+			Card::new(Rank::Ace, Suit::Diamonds),
+			Card::new(Rank::Six, Suit::Clubs),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::TwoPair(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.high_pair[0].to_string(), "Ah");
+			assert_eq!(&hand.high_pair[1].to_string(), "Ad");
+			assert_eq!(&hand.low_pair[0].to_string(), "Td");
+			assert_eq!(&hand.low_pair[1].to_string(), "Th");
+			assert_eq!(hand.kickers.len(), 1);
+		} else {
+			panic!("Expected TwoPair hand");
+		}
 	}
 
 	#[test]
-	fn should_extract_two_pair_ignoring_extra_pairs() {
-		assert_eq!(
-			// contains extra pair sixes
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Queen, Suit::Clubs),
-					Card::new(Rank::Jack, Suit::Clubs),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Six, Suit::Diamonds),
-					Card::new(Rank::Jack, Suit::Diamonds),
-					Card::new(Rank::Eight, Suit::Spades),
-					Card::new(Rank::Six, Suit::Clubs),
-					Card::new(Rank::Queen, Suit::Spades),
-				],
-			}),
-			Hand {
-				rank: HandRank::TwoPair,
-				rank_cards: vec![
-					Card::new(Rank::Queen, Suit::Clubs),
-					Card::new(Rank::Queen, Suit::Spades),
-					Card::new(Rank::Jack, Suit::Clubs),
-					Card::new(Rank::Jack, Suit::Diamonds),
-				],
-				kicker_cards: vec![Card::new(Rank::Eight, Suit::Spades)],
-			}
-		);
+	fn three_of_a_kind() {
+		let pocket_cards = [
+			Card::new(Rank::Ace, Suit::Hearts),
+			Card::new(Rank::Ten, Suit::Diamonds),
+		];
+		let community_cards = [
+			Card::new(Rank::Two, Suit::Clubs),
+			Card::new(Rank::Eight, Suit::Spades),
+			Card::new(Rank::Five, Suit::Hearts),
+			Card::new(Rank::Ace, Suit::Diamonds),
+			Card::new(Rank::Ace, Suit::Clubs),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::ThreeOfAKind(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.triplet[0].to_string(), "Ah");
+			assert_eq!(&hand.triplet[1].to_string(), "Ad");
+			assert_eq!(&hand.triplet[2].to_string(), "Ac");
+			assert_eq!(hand.kickers.len(), 2);
+		} else {
+			panic!("Expected ThreeOfAKind hand");
+		}
 	}
 
 	#[test]
-	fn should_extract_three_of_a_kind() {
-		assert_eq!(
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Eight, Suit::Spades),
-					Card::new(Rank::Six, Suit::Clubs),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Six, Suit::Diamonds),
-					Card::new(Rank::Two, Suit::Diamonds),
-					Card::new(Rank::Jack, Suit::Diamonds),
-					Card::new(Rank::Six, Suit::Hearts),
-					Card::new(Rank::Queen, Suit::Clubs),
-				],
-			}),
-			Hand {
-				rank: HandRank::ThreeOfAKind,
-				rank_cards: vec![
-					Card::new(Rank::Six, Suit::Clubs),
-					Card::new(Rank::Six, Suit::Diamonds),
-					Card::new(Rank::Six, Suit::Hearts),
-				],
-				kicker_cards: vec![
-					Card::new(Rank::Queen, Suit::Clubs),
-					Card::new(Rank::Jack, Suit::Diamonds),
-				],
-			}
-		);
+	fn straight() {
+		let pocket_cards = [
+			Card::new(Rank::Ace, Suit::Hearts),
+			Card::new(Rank::Ten, Suit::Diamonds),
+		];
+		let community_cards = [
+			Card::new(Rank::Two, Suit::Clubs),
+			Card::new(Rank::Three, Suit::Spades),
+			Card::new(Rank::Four, Suit::Hearts),
+			Card::new(Rank::Five, Suit::Diamonds),
+			Card::new(Rank::Six, Suit::Clubs),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::Straight(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.straight[0].to_string(), "6c");
+			assert_eq!(&hand.straight[1].to_string(), "5d");
+			assert_eq!(&hand.straight[2].to_string(), "4h");
+			assert_eq!(&hand.straight[3].to_string(), "3s");
+			assert_eq!(&hand.straight[4].to_string(), "2c");
+		} else {
+			panic!("Expected Straight hand");
+		}
 	}
 
 	#[test]
-	fn should_extract_straight() {
-		assert_eq!(
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Eight, Suit::Spades),
-					Card::new(Rank::Six, Suit::Hearts),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Four, Suit::Diamonds),
-					Card::new(Rank::Two, Suit::Clubs),
-					Card::new(Rank::Three, Suit::Diamonds),
-					Card::new(Rank::Five, Suit::Clubs),
-					Card::new(Rank::Six, Suit::Diamonds),
-				],
-			}),
-			Hand {
-				rank: HandRank::Straight,
-				rank_cards: vec![
-					Card::new(Rank::Six, Suit::Diamonds),
-					Card::new(Rank::Five, Suit::Clubs),
-					Card::new(Rank::Four, Suit::Diamonds),
-					Card::new(Rank::Three, Suit::Diamonds),
-					Card::new(Rank::Two, Suit::Clubs),
-				],
-				kicker_cards: vec![],
-			}
-		);
+	fn straight_with_ace_low() {
+		let pocket_cards = [
+			Card::new(Rank::Ace, Suit::Hearts),
+			Card::new(Rank::Ten, Suit::Diamonds),
+		];
+		let community_cards = [
+			Card::new(Rank::Two, Suit::Clubs),
+			Card::new(Rank::Three, Suit::Spades),
+			Card::new(Rank::Four, Suit::Hearts),
+			Card::new(Rank::Five, Suit::Diamonds),
+			Card::new(Rank::Seven, Suit::Clubs),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::Straight(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.straight[0].to_string(), "5d");
+			assert_eq!(&hand.straight[1].to_string(), "4h");
+			assert_eq!(&hand.straight[2].to_string(), "3s");
+			assert_eq!(&hand.straight[3].to_string(), "2c");
+			assert_eq!(&hand.straight[4].to_string(), "Ah");
+		} else {
+			panic!("Expected Straight hand");
+		}
 	}
 
 	#[test]
-	fn should_extract_straight_ace_low() {
-		assert_eq!(
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Ace, Suit::Spades),
-					Card::new(Rank::Eight, Suit::Hearts),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Four, Suit::Diamonds),
-					Card::new(Rank::Two, Suit::Clubs),
-					Card::new(Rank::Three, Suit::Diamonds),
-					Card::new(Rank::Five, Suit::Clubs),
-					Card::new(Rank::Eight, Suit::Diamonds),
-				],
-			}),
-			Hand {
-				rank: HandRank::Straight,
-				rank_cards: vec![
-					Card::new(Rank::Five, Suit::Clubs),
-					Card::new(Rank::Four, Suit::Diamonds),
-					Card::new(Rank::Three, Suit::Diamonds),
-					Card::new(Rank::Two, Suit::Clubs),
-					Card::new(Rank::Ace, Suit::Spades),
-				],
-				kicker_cards: vec![],
-			}
-		);
+	fn flush() {
+		let pocket_cards = [
+			Card::new(Rank::Three, Suit::Diamonds),
+			Card::new(Rank::Jack, Suit::Diamonds),
+		];
+		let community_cards = [
+			Card::new(Rank::Four, Suit::Diamonds),
+			Card::new(Rank::Two, Suit::Diamonds),
+			Card::new(Rank::Three, Suit::Spades),
+			Card::new(Rank::Five, Suit::Diamonds),
+			Card::new(Rank::Jack, Suit::Hearts),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::Flush(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.flush[0].to_string(), "Jd");
+			assert_eq!(&hand.flush[1].to_string(), "5d");
+			assert_eq!(&hand.flush[2].to_string(), "4d");
+			assert_eq!(&hand.flush[3].to_string(), "3d");
+			assert_eq!(&hand.flush[4].to_string(), "2d");
+		} else {
+			panic!("Expected Flush hand");
+		}
 	}
 
 	#[test]
-	fn should_not_extract_straight_ace_ambiguous() {
-		assert_eq!(
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Ace, Suit::Diamonds),
-					Card::new(Rank::Five, Suit::Diamonds),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Nine, Suit::Diamonds),
-					Card::new(Rank::Queen, Suit::Clubs),
-					Card::new(Rank::Seven, Suit::Hearts),
-					Card::new(Rank::King, Suit::Clubs),
-					Card::new(Rank::Jack, Suit::Diamonds),
-				],
-			}),
-			Hand {
-				rank: HandRank::HighCard,
-				rank_cards: vec![Card::new(Rank::Ace, Suit::Diamonds)],
-				kicker_cards: vec![
-					Card::new(Rank::King, Suit::Clubs),
-					Card::new(Rank::Queen, Suit::Clubs),
-					Card::new(Rank::Jack, Suit::Diamonds),
-					Card::new(Rank::Nine, Suit::Diamonds),
-				],
-			}
-		);
+	fn full_house() {
+		let pocket_cards = [
+			Card::new(Rank::Three, Suit::Spades),
+			Card::new(Rank::Four, Suit::Diamonds),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Three, Suit::Clubs),
+			Card::new(Rank::Three, Suit::Diamonds),
+			Card::new(Rank::Five, Suit::Diamonds),
+			Card::new(Rank::Jack, Suit::Diamonds),
+			Card::new(Rank::Jack, Suit::Hearts),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::FullHouse(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.triplet[0].to_string(), "3s");
+			assert_eq!(&hand.triplet[1].to_string(), "3c");
+			assert_eq!(&hand.triplet[2].to_string(), "3d");
+			assert_eq!(&hand.pair[0].to_string(), "Jd");
+			assert_eq!(&hand.pair[1].to_string(), "Jh");
+		} else {
+			panic!("Expected FullHouse hand");
+		}
 	}
 
 	#[test]
-	fn should_extract_straight_queen_ace_high() {
-		assert_eq!(
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Jack, Suit::Diamonds),
-					Card::new(Rank::Three, Suit::Clubs),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Queen, Suit::Diamonds),
-					Card::new(Rank::King, Suit::Clubs),
-					Card::new(Rank::Eight, Suit::Diamonds),
-					Card::new(Rank::Ten, Suit::Hearts),
-					Card::new(Rank::Ace, Suit::Hearts),
-				],
-			}),
-			Hand {
-				rank: HandRank::Straight,
-				rank_cards: vec![
-					Card::new(Rank::Ace, Suit::Hearts),
-					Card::new(Rank::King, Suit::Clubs),
-					Card::new(Rank::Queen, Suit::Diamonds),
-					Card::new(Rank::Jack, Suit::Diamonds),
-					Card::new(Rank::Ten, Suit::Hearts),
-				],
-				kicker_cards: vec![],
-			}
-		);
+	fn full_house_with_highest_pair() {
+		let pocket_cards = [
+			Card::new(Rank::Four, Suit::Diamonds),
+			Card::new(Rank::Jack, Suit::Hearts),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Four, Suit::Hearts),
+			Card::new(Rank::Three, Suit::Clubs),
+			Card::new(Rank::Three, Suit::Diamonds),
+			Card::new(Rank::Jack, Suit::Spades),
+			Card::new(Rank::Jack, Suit::Diamonds),
+		];
 
-		// invert community
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
 
-		assert_eq!(
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Jack, Suit::Diamonds),
-					Card::new(Rank::Three, Suit::Clubs),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Ace, Suit::Hearts),
-					Card::new(Rank::Ten, Suit::Hearts),
-					Card::new(Rank::Eight, Suit::Diamonds),
-					Card::new(Rank::King, Suit::Clubs),
-					Card::new(Rank::Queen, Suit::Diamonds),
-				],
-			}),
-			Hand {
-				rank: HandRank::Straight,
-				rank_cards: vec![
-					Card::new(Rank::Ace, Suit::Hearts),
-					Card::new(Rank::King, Suit::Clubs),
-					Card::new(Rank::Queen, Suit::Diamonds),
-					Card::new(Rank::Jack, Suit::Diamonds),
-					Card::new(Rank::Ten, Suit::Hearts),
-				],
-				kicker_cards: vec![],
-			}
-		);
+		if let Ok(Hand::FullHouse(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.triplet[0].to_string(), "Jh");
+			assert_eq!(&hand.triplet[1].to_string(), "Js");
+			assert_eq!(&hand.triplet[2].to_string(), "Jd");
+			assert_eq!(&hand.pair[0].to_string(), "4d");
+			assert_eq!(&hand.pair[1].to_string(), "4h");
+		} else {
+			panic!("Expected FullHouse hand");
+		}
 	}
 
 	#[test]
-	fn should_extract_flush() {
-		assert_eq!(
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Three, Suit::Diamonds),
-					Card::new(Rank::Jack, Suit::Diamonds),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Four, Suit::Diamonds),
-					Card::new(Rank::Two, Suit::Diamonds),
-					Card::new(Rank::Three, Suit::Spades),
-					Card::new(Rank::Five, Suit::Diamonds),
-					Card::new(Rank::Jack, Suit::Hearts),
-				],
-			}),
-			Hand {
-				rank: HandRank::Flush,
-				rank_cards: vec![
-					Card::new(Rank::Jack, Suit::Diamonds),
-					Card::new(Rank::Five, Suit::Diamonds),
-					Card::new(Rank::Four, Suit::Diamonds),
-					Card::new(Rank::Three, Suit::Diamonds),
-					Card::new(Rank::Two, Suit::Diamonds),
-				],
-				kicker_cards: vec![],
-			}
-		);
+	fn full_house_with_highest_triplet() {
+		let pocket_cards = [
+			Card::new(Rank::Four, Suit::Diamonds),
+			Card::new(Rank::Three, Suit::Clubs),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Three, Suit::Hearts),
+			Card::new(Rank::Three, Suit::Diamonds),
+			Card::new(Rank::Jack, Suit::Spades),
+			Card::new(Rank::Jack, Suit::Diamonds),
+			Card::new(Rank::Jack, Suit::Hearts),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::FullHouse(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.triplet[0].to_string(), "Js");
+			assert_eq!(&hand.triplet[1].to_string(), "Jd");
+			assert_eq!(&hand.triplet[2].to_string(), "Jh");
+			assert_eq!(&hand.pair[0].to_string(), "3c");
+			assert_eq!(&hand.pair[1].to_string(), "3h");
+		} else {
+			panic!("Expected FullHouse hand");
+		}
 	}
 
 	#[test]
-	fn should_extract_full_house() {
-		assert_eq!(
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Three, Suit::Spades),
-					Card::new(Rank::Four, Suit::Diamonds),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Three, Suit::Clubs),
-					Card::new(Rank::Three, Suit::Diamonds),
-					Card::new(Rank::Five, Suit::Diamonds),
-					Card::new(Rank::Jack, Suit::Diamonds),
-					Card::new(Rank::Jack, Suit::Hearts),
-				],
-			}),
-			Hand {
-				rank: HandRank::FullHouse,
-				rank_cards: vec![
-					Card::new(Rank::Three, Suit::Spades),
-					Card::new(Rank::Three, Suit::Clubs),
-					Card::new(Rank::Three, Suit::Diamonds),
-					Card::new(Rank::Jack, Suit::Diamonds),
-					Card::new(Rank::Jack, Suit::Hearts),
-				],
-				kicker_cards: vec![],
-			}
-		);
+	fn four_of_a_kind() {
+		let pocket_cards = [
+			Card::new(Rank::Jack, Suit::Diamonds),
+			Card::new(Rank::Six, Suit::Diamonds),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Six, Suit::Hearts),
+			Card::new(Rank::Six, Suit::Spades),
+			Card::new(Rank::Queen, Suit::Clubs),
+			Card::new(Rank::Eight, Suit::Spades),
+			Card::new(Rank::Six, Suit::Clubs),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::FourOfAKind(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.quad[0].to_string(), "6d");
+			assert_eq!(&hand.quad[1].to_string(), "6h");
+			assert_eq!(&hand.quad[2].to_string(), "6s");
+			assert_eq!(&hand.quad[3].to_string(), "6c");
+			assert_eq!(&hand.kickers.first().unwrap().to_string(), "Qc");
+		} else {
+			panic!("Expected FourOfAKind hand");
+		}
 	}
 
 	#[test]
-	fn should_extract_full_house_with_highest_pair() {
-		assert_eq!(
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Four, Suit::Diamonds),
-					Card::new(Rank::Jack, Suit::Hearts),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Four, Suit::Hearts),
-					Card::new(Rank::Three, Suit::Clubs),
-					Card::new(Rank::Three, Suit::Diamonds),
-					Card::new(Rank::Jack, Suit::Spades),
-					Card::new(Rank::Jack, Suit::Diamonds),
-				],
-			}),
-			Hand {
-				rank: HandRank::FullHouse,
-				rank_cards: vec![
-					Card::new(Rank::Jack, Suit::Hearts),
-					Card::new(Rank::Jack, Suit::Spades),
-					Card::new(Rank::Jack, Suit::Diamonds),
-					Card::new(Rank::Four, Suit::Diamonds),
-					Card::new(Rank::Four, Suit::Hearts),
-				],
-				kicker_cards: vec![],
-			}
-		);
+	fn straight_flush() {
+		let pocket_cards = [
+			Card::new(Rank::Two, Suit::Clubs),
+			Card::new(Rank::Six, Suit::Clubs),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Four, Suit::Clubs),
+			Card::new(Rank::Three, Suit::Clubs),
+			Card::new(Rank::Eight, Suit::Spades),
+			Card::new(Rank::Five, Suit::Clubs),
+			Card::new(Rank::Six, Suit::Spades),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::StraightFlush(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.straight_flush[0].to_string(), "6c");
+			assert_eq!(&hand.straight_flush[1].to_string(), "5c");
+			assert_eq!(&hand.straight_flush[2].to_string(), "4c");
+			assert_eq!(&hand.straight_flush[3].to_string(), "3c");
+			assert_eq!(&hand.straight_flush[4].to_string(), "2c");
+		} else {
+			panic!("Expected StraightFlush hand");
+		}
 	}
 
 	#[test]
-	fn should_extract_full_house_with_highest_triplet() {
-		assert_eq!(
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Four, Suit::Diamonds),
-					Card::new(Rank::Three, Suit::Clubs),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Three, Suit::Hearts),
-					Card::new(Rank::Three, Suit::Diamonds),
-					Card::new(Rank::Jack, Suit::Spades),
-					Card::new(Rank::Jack, Suit::Diamonds),
-					Card::new(Rank::Jack, Suit::Hearts),
-				],
-			}),
-			Hand {
-				rank: HandRank::FullHouse,
-				rank_cards: vec![
-					Card::new(Rank::Jack, Suit::Spades),
-					Card::new(Rank::Jack, Suit::Diamonds),
-					Card::new(Rank::Jack, Suit::Hearts),
-					Card::new(Rank::Three, Suit::Clubs),
-					Card::new(Rank::Three, Suit::Hearts),
-				],
-				kicker_cards: vec![],
-			}
-		);
+	fn straight_flush_ace_low() {
+		let pocket_cards = [
+			Card::new(Rank::Ace, Suit::Spades),
+			Card::new(Rank::Eight, Suit::Hearts),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Four, Suit::Spades),
+			Card::new(Rank::Two, Suit::Spades),
+			Card::new(Rank::Three, Suit::Spades),
+			Card::new(Rank::Five, Suit::Spades),
+			Card::new(Rank::Eight, Suit::Diamonds),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::StraightFlush(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.straight_flush[0].to_string(), "5s");
+			assert_eq!(&hand.straight_flush[1].to_string(), "4s");
+			assert_eq!(&hand.straight_flush[2].to_string(), "3s");
+			assert_eq!(&hand.straight_flush[3].to_string(), "2s");
+			assert_eq!(&hand.straight_flush[4].to_string(), "As");
+		} else {
+			panic!("Expected StraightFlush hand");
+		}
 	}
 
 	#[test]
-	fn should_extract_four_of_a_kind() {
-		assert_eq!(
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Jack, Suit::Diamonds),
-					Card::new(Rank::Six, Suit::Diamonds),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Six, Suit::Hearts),
-					Card::new(Rank::Six, Suit::Spades),
-					Card::new(Rank::Queen, Suit::Clubs),
-					Card::new(Rank::Eight, Suit::Spades),
-					Card::new(Rank::Six, Suit::Clubs),
-				],
-			}),
-			Hand {
-				rank: HandRank::FourOfAKind,
-				rank_cards: vec![
-					Card::new(Rank::Six, Suit::Diamonds),
-					Card::new(Rank::Six, Suit::Hearts),
-					Card::new(Rank::Six, Suit::Spades),
-					Card::new(Rank::Six, Suit::Clubs),
-				],
-				kicker_cards: vec![Card::new(Rank::Queen, Suit::Clubs)],
-			}
-		);
+	fn ignores_straight_flush_with_offsuit_ace() {
+		let pocket_cards = [
+			Card::new(Rank::Ace, Suit::Clubs),
+			Card::new(Rank::Two, Suit::Spades),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Three, Suit::Spades),
+			Card::new(Rank::Four, Suit::Spades),
+			Card::new(Rank::Five, Suit::Spades),
+			Card::new(Rank::Eight, Suit::Spades),
+		];
+
+		if let Ok(Hand::Flush(hand)) =
+			Hand::try_from(&HandCandidate::new(&pocket_cards, &community_cards))
+		{
+			assert_eq!(&hand.flush[0].to_string(), "8s");
+			assert_eq!(&hand.flush[1].to_string(), "5s");
+			assert_eq!(&hand.flush[2].to_string(), "4s");
+			assert_eq!(&hand.flush[3].to_string(), "3s");
+			assert_eq!(&hand.flush[4].to_string(), "2s");
+		} else {
+			panic!("Expected Flush hand");
+		}
 	}
 
 	#[test]
-	fn should_extract_straight_flush() {
-		assert_eq!(
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Two, Suit::Clubs),
-					Card::new(Rank::Six, Suit::Clubs),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Four, Suit::Clubs),
-					Card::new(Rank::Three, Suit::Clubs),
-					Card::new(Rank::Eight, Suit::Spades),
-					Card::new(Rank::Five, Suit::Clubs),
-					Card::new(Rank::Six, Suit::Spades),
-				],
-			}),
-			Hand {
-				rank: HandRank::StraightFlush,
-				rank_cards: vec![
-					Card::new(Rank::Six, Suit::Clubs),
-					Card::new(Rank::Five, Suit::Clubs),
-					Card::new(Rank::Four, Suit::Clubs),
-					Card::new(Rank::Three, Suit::Clubs),
-					Card::new(Rank::Two, Suit::Clubs),
-				],
-				kicker_cards: vec![],
-			}
-		);
+	fn ignores_straight_flush_with_ambiguous_ace() {
+		let pocket_cards = [
+			Card::new(Rank::Ace, Suit::Diamonds),
+			Card::new(Rank::Five, Suit::Diamonds),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Nine, Suit::Diamonds),
+			Card::new(Rank::Queen, Suit::Diamonds),
+			Card::new(Rank::Seven, Suit::Diamonds),
+			Card::new(Rank::King, Suit::Diamonds),
+			Card::new(Rank::Jack, Suit::Diamonds),
+		];
+
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
+
+		if let Ok(Hand::Flush(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.flush[0].to_string(), "Ad");
+			assert_eq!(&hand.flush[1].to_string(), "Kd");
+			assert_eq!(&hand.flush[2].to_string(), "Qd");
+			assert_eq!(&hand.flush[3].to_string(), "Jd");
+			assert_eq!(&hand.flush[4].to_string(), "9d");
+		} else {
+			panic!("Expected Flush hand");
+		}
 	}
 
 	#[test]
-	fn should_extract_straight_flush_ace_low() {
-		assert_eq!(
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Ace, Suit::Spades),
-					Card::new(Rank::Eight, Suit::Hearts),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Four, Suit::Spades),
-					Card::new(Rank::Two, Suit::Spades),
-					Card::new(Rank::Three, Suit::Spades),
-					Card::new(Rank::Five, Suit::Spades),
-					Card::new(Rank::Eight, Suit::Diamonds),
-				],
-			}),
-			Hand {
-				rank: HandRank::StraightFlush,
-				rank_cards: vec![
-					Card::new(Rank::Five, Suit::Spades),
-					Card::new(Rank::Four, Suit::Spades),
-					Card::new(Rank::Three, Suit::Spades),
-					Card::new(Rank::Two, Suit::Spades),
-					Card::new(Rank::Ace, Suit::Spades),
-				],
-				kicker_cards: vec![],
-			}
-		);
-	}
+	fn royal_flush() {
+		let pocket_cards = [
+			Card::new(Rank::Ace, Suit::Hearts),
+			Card::new(Rank::Jack, Suit::Hearts),
+		];
+		let community_cards = vec![
+			Card::new(Rank::Ten, Suit::Hearts),
+			Card::new(Rank::King, Suit::Hearts),
+			Card::new(Rank::Queen, Suit::Hearts),
+			Card::new(Rank::Three, Suit::Clubs),
+			Card::new(Rank::Four, Suit::Diamonds),
+		];
 
-	#[test]
-	fn should_not_extract_straight_flush_offsuit_ace() {
-		assert_eq!(
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Ace, Suit::Clubs),
-					Card::new(Rank::Two, Suit::Spades),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Three, Suit::Spades),
-					Card::new(Rank::Four, Suit::Spades),
-					Card::new(Rank::Five, Suit::Spades),
-					Card::new(Rank::Eight, Suit::Spades),
-				],
-			}),
-			Hand {
-				rank: HandRank::Flush,
-				rank_cards: vec![
-					Card::new(Rank::Eight, Suit::Spades),
-					Card::new(Rank::Five, Suit::Spades),
-					Card::new(Rank::Four, Suit::Spades),
-					Card::new(Rank::Three, Suit::Spades),
-					Card::new(Rank::Two, Suit::Spades),
-				],
-				kicker_cards: vec![],
-			}
-		);
-	}
+		let candidate = HandCandidate::new(&pocket_cards, &community_cards);
 
-	#[test]
-	fn should_not_extract_straight_flush_ambiguous_ace() {
-		assert_eq!(
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Ace, Suit::Diamonds),
-					Card::new(Rank::Five, Suit::Diamonds),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Nine, Suit::Diamonds),
-					Card::new(Rank::Queen, Suit::Diamonds),
-					Card::new(Rank::Seven, Suit::Diamonds),
-					Card::new(Rank::King, Suit::Diamonds),
-					Card::new(Rank::Jack, Suit::Diamonds),
-				],
-			}),
-			Hand {
-				rank: HandRank::Flush,
-				rank_cards: vec![
-					Card::new(Rank::Ace, Suit::Diamonds),
-					Card::new(Rank::King, Suit::Diamonds),
-					Card::new(Rank::Queen, Suit::Diamonds),
-					Card::new(Rank::Jack, Suit::Diamonds),
-					Card::new(Rank::Nine, Suit::Diamonds),
-				],
-				kicker_cards: vec![],
-			}
-		);
-	}
-
-	#[test]
-	fn should_extract_royal_flush() {
-		assert_eq!(
-			Hand::from(HandCandidate {
-				pocket_cards: &[
-					Card::new(Rank::Ace, Suit::Hearts),
-					Card::new(Rank::Jack, Suit::Hearts),
-				],
-				community_cards: &vec![
-					Card::new(Rank::Ten, Suit::Hearts),
-					Card::new(Rank::King, Suit::Hearts),
-					Card::new(Rank::Queen, Suit::Hearts),
-					Card::new(Rank::Three, Suit::Clubs),
-					Card::new(Rank::Four, Suit::Diamonds),
-				],
-			}),
-			Hand {
-				rank: HandRank::RoyalFlush,
-				rank_cards: vec![
-					Card::new(Rank::Ace, Suit::Hearts),
-					Card::new(Rank::King, Suit::Hearts),
-					Card::new(Rank::Queen, Suit::Hearts),
-					Card::new(Rank::Jack, Suit::Hearts),
-					Card::new(Rank::Ten, Suit::Hearts),
-				],
-				kicker_cards: vec![],
-			}
-		);
+		if let Ok(Hand::RoyalFlush(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.royal_flush[0].to_string(), "Ah");
+			assert_eq!(&hand.royal_flush[1].to_string(), "Kh");
+			assert_eq!(&hand.royal_flush[2].to_string(), "Qh");
+			assert_eq!(&hand.royal_flush[3].to_string(), "Jh");
+			assert_eq!(&hand.royal_flush[4].to_string(), "Th");
+		} else {
+			panic!("Expected RoyalFlush hand");
+		}
 	}
 }

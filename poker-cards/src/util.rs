@@ -1,7 +1,5 @@
 use std::cmp::Ordering;
 
-use crate::{Card, Rank};
-
 pub fn without<TItem: Copy + PartialEq>(
 	items: &[TItem],
 	from_items: &[TItem],
@@ -69,25 +67,4 @@ pub fn cmp_max<T: Ord>(a_opt: &[T], b_opt: &[T]) -> Ordering {
 		(None, Some(_)) => Ordering::Less,
 		(Some(_), None) => Ordering::Greater,
 	}
-}
-
-pub fn is_ace_low_straight(cards: &[Card]) -> bool {
-	let mut has_ace = false;
-	let mut has_two = false;
-
-	for card in cards {
-		if card.rank == Rank::Two {
-			has_two = true;
-		}
-
-		if card.rank == Rank::Ace {
-			has_ace = true;
-		}
-
-		if has_ace && has_two {
-			return true;
-		}
-	}
-
-	false
 }
