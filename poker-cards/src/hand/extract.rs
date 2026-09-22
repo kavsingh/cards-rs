@@ -174,11 +174,10 @@ impl From<HandCandidate<'_>> for Hand {
 
 		Self {
 			rank: HandRank::HighCard,
-			rank_cards: sorted.first().map(|c| vec![*c]).unwrap_or_default(),
+			rank_cards: sorted.first().map_or_default(|c| vec![*c]),
 			kicker_cards: sorted
 				.get(1..5)
-				.map(std::borrow::ToOwned::to_owned)
-				.unwrap_or_default(),
+				.map_or_default(std::borrow::ToOwned::to_owned),
 		}
 	}
 }

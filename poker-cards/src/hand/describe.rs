@@ -14,24 +14,21 @@ fn describe_rank(card: Card) -> String {
 }
 
 fn describe_full_house(cards: &[Card]) -> String {
-	let triplet_rank =
-		cards.first().map(|c| describe_rank(*c)).unwrap_or_default();
-	let pair_rank = cards.get(3).map(|c| describe_rank(*c)).unwrap_or_default();
+	let triplet_rank = cards.first().map_or_default(|c| describe_rank(*c));
+	let pair_rank = cards.get(3).map_or_default(|c| describe_rank(*c));
 
 	format!("{triplet_rank}s over {pair_rank}s")
 }
 
 fn describe_two_pair(cards: &[Card]) -> String {
-	let high_rank =
-		cards.first().map(|c| describe_rank(*c)).unwrap_or_default();
-	let low_rank = cards.get(2).map(|c| describe_rank(*c)).unwrap_or_default();
+	let high_rank = cards.first().map_or_default(|c| describe_rank(*c));
+	let low_rank = cards.get(2).map_or_default(|c| describe_rank(*c));
 
 	format!("{high_rank}s over {low_rank}s")
 }
 
 fn describe_straight(cards: &[Card]) -> String {
-	let high_rank =
-		cards.first().map(|c| describe_rank(*c)).unwrap_or_default();
+	let high_rank = cards.first().map_or_default(|c| describe_rank(*c));
 
 	format!("{high_rank} high")
 }
@@ -40,13 +37,11 @@ fn describe_hand(hand: &Hand) -> String {
 	let first_rank = hand
 		.rank_cards
 		.first()
-		.map(|c| describe_rank(*c))
-		.unwrap_or_default();
+		.map_or_default(|c| describe_rank(*c));
 	let first_kicker = hand
 		.kicker_cards
 		.first()
-		.map(|c| describe_rank(*c))
-		.unwrap_or_default();
+		.map_or_default(|c| describe_rank(*c));
 
 	match hand.rank {
 		HandRank::RoyalFlush => "Royal Flush".to_string(),
