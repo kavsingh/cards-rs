@@ -86,10 +86,11 @@ impl TryFrom<&HandCandidate> for HighCard {
 			.sorted_cards
 			.first()
 			.ok_or(Self::Error::NotEnoughCards)?;
-		let kicker_cards =
-			candidate.sorted_cards.get(1..5).unwrap_or_default().to_vec();
 
-		Ok(Self { high_card: high_card.to_owned(), kickers: kicker_cards })
+		Ok(Self {
+			high_card: high_card.to_owned(),
+			kickers: kickers_from(&candidate.sorted_cards, &[*high_card]),
+		})
 	}
 }
 
@@ -250,7 +251,6 @@ impl TryFrom<&HandCandidate> for Hand {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::panic)]
 mod tests {
 	use super::*;
 	use crate::{Card, Rank, Suit};
@@ -274,6 +274,18 @@ mod tests {
 		if let Ok(Hand::HighCard(hand)) = Hand::try_from(&candidate) {
 			assert_eq!(&hand.high_card.to_string(), "Ah");
 			assert_eq!(hand.kickers.len(), 4);
+		} else {
+			panic!("Expected HighCard hand");
+		}
+
+		let candidate = HandCandidate::new(
+			&pocket_cards,
+			&[Card::new(Rank::Two, Suit::Clubs)],
+		);
+
+		if let Ok(Hand::HighCard(hand)) = Hand::try_from(&candidate) {
+			assert_eq!(&hand.high_card.to_string(), "Ah");
+			assert_eq!(hand.kickers.len(), 2);
 		} else {
 			panic!("Expected HighCard hand");
 		}
