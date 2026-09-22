@@ -117,21 +117,19 @@ impl RankedHand for Hand {
 
 impl Ord for Hand {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-		self.rank()
-			.cmp(&other.rank())
-			.then_with(|| match (self, other) {
-				(Self::HighCard(a), Self::HighCard(b)) => a.cmp(b),
-				(Self::Pair(a), Self::Pair(b)) => a.cmp(b),
-				(Self::TwoPair(a), Self::TwoPair(b)) => a.cmp(b),
-				(Self::ThreeOfAKind(a), Self::ThreeOfAKind(b)) => a.cmp(b),
-				(Self::Straight(a), Self::Straight(b)) => a.cmp(b),
-				(Self::Flush(a), Self::Flush(b)) => a.cmp(b),
-				(Self::FullHouse(a), Self::FullHouse(b)) => a.cmp(b),
-				(Self::FourOfAKind(a), Self::FourOfAKind(b)) => a.cmp(b),
-				(Self::StraightFlush(a), Self::StraightFlush(b)) => a.cmp(b),
-				(Self::RoyalFlush(a), Self::RoyalFlush(b)) => a.cmp(b),
-				_ => std::cmp::Ordering::Less,
-			})
+		self.rank().cmp(&other.rank()).then_with(|| match (self, other) {
+			(Self::HighCard(a), Self::HighCard(b)) => a.cmp(b),
+			(Self::Pair(a), Self::Pair(b)) => a.cmp(b),
+			(Self::TwoPair(a), Self::TwoPair(b)) => a.cmp(b),
+			(Self::ThreeOfAKind(a), Self::ThreeOfAKind(b)) => a.cmp(b),
+			(Self::Straight(a), Self::Straight(b)) => a.cmp(b),
+			(Self::Flush(a), Self::Flush(b)) => a.cmp(b),
+			(Self::FullHouse(a), Self::FullHouse(b)) => a.cmp(b),
+			(Self::FourOfAKind(a), Self::FourOfAKind(b)) => a.cmp(b),
+			(Self::StraightFlush(a), Self::StraightFlush(b)) => a.cmp(b),
+			(Self::RoyalFlush(a), Self::RoyalFlush(b)) => a.cmp(b),
+			_ => std::cmp::Ordering::Less,
+		})
 	}
 }
 
@@ -154,105 +152,104 @@ impl Eq for Hand {}
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::panic)]
 mod tests {
-	fn c(s: &str) -> super::Card {
+	use super::*;
+
+	fn c(s: &str) -> Card {
 		s.parse().unwrap()
 	}
 
 	#[test]
 	#[allow(clippy::too_many_lines)]
 	fn hands() {
-		let high_king_10_kicker = super::Hand::HighCard(super::HighCard {
+		let high_king_10_kicker = Hand::HighCard(HighCard {
 			high_card: c("Kd"),
 			kickers: vec![c("Tc")],
 		});
 
-		let high_king_6_kicker = super::Hand::HighCard(super::HighCard {
+		let high_king_6_kicker = Hand::HighCard(HighCard {
 			high_card: c("Kc"),
 			kickers: vec![c("6d")],
 		});
 
-		let two_pair_jack_sixes = super::Hand::TwoPair(super::TwoPair {
+		let two_pair_jack_sixes = Hand::TwoPair(TwoPair {
 			high_pair: [c("Jd"), c("Jc")],
 			low_pair: [c("6d"), c("6c")],
 			kickers: vec![],
 		});
 
-		let two_pair_jack_fives = super::Hand::TwoPair(super::TwoPair {
+		let two_pair_jack_fives = Hand::TwoPair(TwoPair {
 			high_pair: [c("Jd"), c("Jc")],
 			low_pair: [c("5d"), c("5c")],
 			kickers: vec![],
 		});
 
-		let straight_no_ace = super::Hand::Straight(super::Straight {
+		let straight_no_ace = Hand::Straight(Straight {
 			straight: [c("6h"), c("5d"), c("4c"), c("3d"), c("2s")],
 		});
 
-		let straight_ace_low = super::Hand::Straight(super::Straight {
+		let straight_ace_low = Hand::Straight(Straight {
 			straight: [c("5d"), c("4c"), c("3d"), c("2h"), c("Ad")],
 		});
 
-		let straight_ace_high = super::Hand::Straight(super::Straight {
+		let straight_ace_high = Hand::Straight(Straight {
 			straight: [c("Ad"), c("Kc"), c("Qh"), c("Jd"), c("Ts")],
 		});
 
-		let flush_king_high = super::Hand::Flush(super::Flush {
+		let flush_king_high = Hand::Flush(Flush {
 			flush: [c("Kd"), c("Qd"), c("8d"), c("7d"), c("4d")],
 		});
 
-		let flush_seven_high = super::Hand::Flush(super::Flush {
+		let flush_seven_high = Hand::Flush(Flush {
 			flush: [c("7s"), c("6s"), c("5s"), c("3s"), c("2s")],
 		});
 
-		let full_house_ace_king = super::Hand::FullHouse(super::FullHouse {
+		let full_house_ace_king = Hand::FullHouse(FullHouse {
 			triplet: [c("Ad"), c("Ac"), c("Ah")],
 			pair: [c("Kd"), c("Kc")],
 		});
 
-		let full_house_ace_6 = super::Hand::FullHouse(super::FullHouse {
+		let full_house_ace_6 = Hand::FullHouse(FullHouse {
 			triplet: [c("Ad"), c("Ac"), c("Ah")],
 			pair: [c("6d"), c("6c")],
 		});
 
-		let full_house_10_3 = super::Hand::FullHouse(super::FullHouse {
+		let full_house_10_3 = Hand::FullHouse(FullHouse {
 			triplet: [c("Td"), c("Tc"), c("Th")],
 			pair: [c("3d"), c("3c")],
 		});
 
-		let four_of_a_kind_9_2 = super::Hand::FourOfAKind(super::FourOfAKind {
+		let four_of_a_kind_9_2 = Hand::FourOfAKind(FourOfAKind {
 			quad: [c("9d"), c("9c"), c("9h"), c("9s")],
 			kickers: vec![c("2d")],
 		});
 
-		let four_of_a_kind_9_6 = super::Hand::FourOfAKind(super::FourOfAKind {
+		let four_of_a_kind_9_6 = Hand::FourOfAKind(FourOfAKind {
 			quad: [c("9d"), c("9c"), c("9h"), c("9s")],
 			kickers: vec![c("6d")],
 		});
 
-		let four_of_a_kind_j = super::Hand::FourOfAKind(super::FourOfAKind {
+		let four_of_a_kind_j = Hand::FourOfAKind(FourOfAKind {
 			quad: [c("Jd"), c("Jc"), c("Jh"), c("Js")],
 			kickers: vec![c("8d")],
 		});
 
-		let straight_flush_9_high =
-			super::Hand::StraightFlush(super::StraightFlush {
-				straight_flush: [c("9d"), c("8d"), c("7d"), c("6d"), c("5d")],
-			});
+		let straight_flush_9_high = Hand::StraightFlush(StraightFlush {
+			straight_flush: [c("9d"), c("8d"), c("7d"), c("6d"), c("5d")],
+		});
 
-		let straight_flush_10_high =
-			super::Hand::StraightFlush(super::StraightFlush {
-				straight_flush: [c("Td"), c("9d"), c("8d"), c("7d"), c("6d")],
-			});
+		let straight_flush_10_high = Hand::StraightFlush(StraightFlush {
+			straight_flush: [c("Td"), c("9d"), c("8d"), c("7d"), c("6d")],
+		});
 
-		let straight_flush_ace_low =
-			super::Hand::StraightFlush(super::StraightFlush {
-				straight_flush: [c("5d"), c("4d"), c("3d"), c("2d"), c("Ad")],
-			});
+		let straight_flush_ace_low = Hand::StraightFlush(StraightFlush {
+			straight_flush: [c("5d"), c("4d"), c("3d"), c("2d"), c("Ad")],
+		});
 
-		let royal_flush_diamonds = super::Hand::RoyalFlush(super::RoyalFlush {
+		let royal_flush_diamonds = Hand::RoyalFlush(RoyalFlush {
 			royal_flush: [c("Ad"), c("Kd"), c("Qd"), c("Jd"), c("Td")],
 		});
 
-		let royal_flush_clubs = super::Hand::RoyalFlush(super::RoyalFlush {
+		let royal_flush_clubs = Hand::RoyalFlush(RoyalFlush {
 			royal_flush: [c("Ac"), c("Kc"), c("Qc"), c("Jc"), c("Tc")],
 		});
 

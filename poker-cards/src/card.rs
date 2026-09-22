@@ -38,10 +38,7 @@ impl Card {
 
 	#[must_use]
 	pub fn rank_value(&self) -> usize {
-		ORDERED_RANKS
-			.iter()
-			.position(|r| *r == self.rank)
-			.unwrap_or_default()
+		ORDERED_RANKS.iter().position(|r| *r == self.rank).unwrap_or_default()
 	}
 
 	#[must_use]
@@ -118,10 +115,8 @@ mod tests {
 		let unsorted = ["Qd", "3h", "As", "Qc"];
 		let sorted = ["3h", "Qd", "Qc", "As"];
 
-		let mut stack = unsorted
-			.iter()
-			.map(|s| s.parse().unwrap())
-			.collect::<Vec<Card>>();
+		let mut stack =
+			unsorted.iter().map(|s| s.parse().unwrap()).collect::<Vec<Card>>();
 
 		stack.sort();
 

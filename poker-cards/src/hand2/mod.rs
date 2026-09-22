@@ -1,5 +1,8 @@
 mod compare;
+mod describe;
 mod extract;
+
+pub use describe::Describe;
 
 use crate::Card;
 

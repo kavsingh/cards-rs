@@ -6,11 +6,7 @@ pub fn without<TItem: Copy + PartialEq>(
 	items: &[TItem],
 	from_items: &[TItem],
 ) -> Vec<TItem> {
-	from_items
-		.iter()
-		.filter(|item| !items.contains(item))
-		.copied()
-		.collect()
+	from_items.iter().filter(|item| !items.contains(item)).copied().collect()
 }
 
 pub fn group_by<TItem: Copy, TKey: PartialEq>(
