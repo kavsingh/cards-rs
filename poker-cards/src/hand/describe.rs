@@ -1,227 +1,338 @@
-use std::fmt::Display;
+use cards::Rank;
 
-use super::{Hand, HandRank};
-use crate::{Card, Rank};
+use super::{
+	Flush, FourOfAKind, FullHouse, Hand, HighCard, Pair, RoyalFlush, Straight,
+	StraightFlush, ThreeOfAKind, TwoPair,
+};
+use crate::Card;
 
-fn describe_rank(card: Card) -> String {
-	match card.rank {
-		Rank::Ace => "Ace".to_string(),
-		Rank::King => "King".to_string(),
-		Rank::Queen => "Queen".to_string(),
-		Rank::Jack => "Jack".to_string(),
-		_ => card.rank.to_string(),
+fn describe_rank(card: Card, is_many: bool) -> String {
+	let (one, many) = match card.rank {
+		Rank::Ace => ("Ace", "Aces"),
+		Rank::King => ("King", "Kings"),
+		Rank::Queen => ("Queen", "Queens"),
+		Rank::Jack => ("Jack", "Jacks"),
+		Rank::Ten => ("Ten", "Tens"),
+		Rank::Nine => ("Nine", "Nines"),
+		Rank::Eight => ("Eight", "Eights"),
+		Rank::Seven => ("Seven", "Sevens"),
+		Rank::Six => ("Six", "Sixes"),
+		Rank::Five => ("Five", "Fives"),
+		Rank::Four => ("Four", "Fours"),
+		Rank::Three => ("Three", "Threes"),
+		Rank::Two => ("Two", "Twos"),
+	};
+
+	if is_many { many.to_string() } else { one.to_string() }
+}
+
+fn describe_kickers(kickers: &[Card]) -> String {
+	if kickers.is_empty() {
+		return String::new();
+	}
+
+	let mut rank_names = vec![];
+
+	for kicker in kickers {
+		let named = describe_rank(*kicker, false);
+
+		if !rank_names.contains(&named) {
+			rank_names.push(named);
+		}
+	}
+
+	let suffix = if rank_names.len() == 1 { "kicker" } else { "kickers" };
+
+	format!(", {} {}", rank_names.join(" "), suffix)
+}
+
+pub trait Describe {
+	fn describe(&self) -> String;
+}
+
+impl Describe for HighCard {
+	fn describe(&self) -> String {
+		format!(
+			"High card, {}{}",
+			describe_rank(self.high_card, false),
+			describe_kickers(&self.kickers)
+		)
 	}
 }
 
-fn describe_full_house(cards: &[Card]) -> String {
-	let triplet_rank = cards.first().map_or_default(|c| describe_rank(*c));
-	let pair_rank = cards.get(3).map_or_default(|c| describe_rank(*c));
-
-	format!("{triplet_rank}s over {pair_rank}s")
-}
-
-fn describe_two_pair(cards: &[Card]) -> String {
-	let high_rank = cards.first().map_or_default(|c| describe_rank(*c));
-	let low_rank = cards.get(2).map_or_default(|c| describe_rank(*c));
-
-	format!("{high_rank}s over {low_rank}s")
-}
-
-fn describe_straight(cards: &[Card]) -> String {
-	let high_rank = cards.first().map_or_default(|c| describe_rank(*c));
-
-	format!("{high_rank} high")
-}
-
-fn describe_hand(hand: &Hand) -> String {
-	let first_rank =
-		hand.rank_cards.first().map_or_default(|c| describe_rank(*c));
-	let first_kicker =
-		hand.kicker_cards.first().map_or_default(|c| describe_rank(*c));
-
-	match hand.rank {
-		HandRank::RoyalFlush => "Royal Flush".to_string(),
-
-		HandRank::StraightFlush => {
-			format!("Straight Flush, {}", describe_straight(&hand.rank_cards))
-		}
-
-		HandRank::FourOfAKind => {
-			format!("Four of a Kind, {first_rank}s, {first_kicker} kicker")
-		}
-
-		HandRank::FullHouse => {
-			format!(
-				"Full House, {}, {first_kicker} kicker",
-				describe_full_house(&hand.rank_cards)
-			)
-		}
-
-		HandRank::Flush => format!("Flush, {first_rank} high"),
-
-		HandRank::Straight => {
-			format!("Straight, {}", describe_straight(&hand.rank_cards))
-		}
-
-		HandRank::ThreeOfAKind => {
-			format!("Three of a Kind, {first_rank}s, {first_kicker} kicker")
-		}
-
-		HandRank::TwoPair => {
-			format!(
-				"Two Pair, {}, {first_kicker} kicker",
-				describe_two_pair(&hand.rank_cards)
-			)
-		}
-
-		HandRank::Pair => {
-			format!("Pair of {first_rank}s, {first_kicker} kicker")
-		}
-
-		HandRank::HighCard => {
-			format!("High Card, {first_rank}, {first_kicker} kicker")
-		}
+impl Describe for Pair {
+	fn describe(&self) -> String {
+		format!(
+			"Pair of {}{}",
+			describe_rank(self.pair[0], true),
+			describe_kickers(&self.kickers)
+		)
 	}
 }
 
-impl Display for Hand {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.write_str(describe_hand(self).as_str())
+impl Describe for TwoPair {
+	fn describe(&self) -> String {
+		format!(
+			"Two pair, {} over {}{}",
+			describe_rank(self.high_pair[0], true),
+			describe_rank(self.low_pair[0], true),
+			describe_kickers(&self.kickers)
+		)
+	}
+}
+
+impl Describe for ThreeOfAKind {
+	fn describe(&self) -> String {
+		format!(
+			"Three of a kind, {}{}",
+			describe_rank(self.triplet[0], true),
+			describe_kickers(&self.kickers)
+		)
+	}
+}
+
+impl Describe for Straight {
+	fn describe(&self) -> String {
+		format!("Straight, {} high", describe_rank(self.straight[0], false))
+	}
+}
+
+impl Describe for Flush {
+	fn describe(&self) -> String {
+		format!("Flush, {} high", describe_rank(self.flush[0], false))
+	}
+}
+
+impl Describe for FullHouse {
+	fn describe(&self) -> String {
+		format!(
+			"Full house, {} over {}",
+			describe_rank(self.triplet[0], true),
+			describe_rank(self.pair[0], true)
+		)
+	}
+}
+
+impl Describe for FourOfAKind {
+	fn describe(&self) -> String {
+		format!(
+			"Four of a kind, {}{}",
+			describe_rank(self.quad[0], true),
+			describe_kickers(&self.kickers)
+		)
+	}
+}
+
+impl Describe for StraightFlush {
+	fn describe(&self) -> String {
+		format!(
+			"Straight flush, {} high",
+			describe_rank(self.straight_flush[0], false)
+		)
+	}
+}
+
+impl Describe for RoyalFlush {
+	fn describe(&self) -> String {
+		"Royal flush".to_string()
+	}
+}
+
+impl Describe for Hand {
+	fn describe(&self) -> String {
+		match self {
+			Self::HighCard(hand) => hand.describe(),
+			Self::Pair(hand) => hand.describe(),
+			Self::TwoPair(hand) => hand.describe(),
+			Self::ThreeOfAKind(hand) => hand.describe(),
+			Self::Straight(hand) => hand.describe(),
+			Self::Flush(hand) => hand.describe(),
+			Self::FullHouse(hand) => hand.describe(),
+			Self::FourOfAKind(hand) => hand.describe(),
+			Self::StraightFlush(hand) => hand.describe(),
+			Self::RoyalFlush(hand) => hand.describe(),
+		}
 	}
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
-	use super::{Hand, HandRank};
-	use crate::{Card, Rank, Suit};
+	use super::*;
 
 	#[test]
-	fn should_describe_high_card() {
-		let high_card = Hand {
-			rank: HandRank::HighCard,
-			rank_cards: vec![Card::new(Rank::King, Suit::Clubs)],
-			kicker_cards: vec![
-				Card::new(Rank::Queen, Suit::Clubs),
-				Card::new(Rank::Jack, Suit::Diamonds),
-				Card::new(Rank::Nine, Suit::Diamonds),
-				Card::new(Rank::Seven, Suit::Diamonds),
-			],
-		};
+	fn high_card() {
+		let no_kickers = Hand::HighCard(HighCard {
+			high_card: "As".parse().unwrap(),
+			kickers: vec![],
+		});
 
+		let with_kickers = Hand::HighCard(HighCard {
+			high_card: "As".parse().unwrap(),
+			kickers: vec![
+				"8s".parse().unwrap(),
+				"4d".parse().unwrap(),
+				"2h".parse().unwrap(),
+			],
+		});
+
+		assert_eq!(no_kickers.describe(), "High card, Ace");
 		assert_eq!(
-			high_card.to_string(),
-			"High Card, King, Queen kicker".to_string()
+			with_kickers.describe(),
+			"High card, Ace, Eight Four Two kickers"
 		);
 	}
 
 	#[test]
-	fn should_describe_pairs() {
-		let pair_jacks = Hand {
-			rank: HandRank::Pair,
-			rank_cards: vec![
-				Card::new(Rank::Jack, Suit::Diamonds),
-				Card::new(Rank::Jack, Suit::Clubs),
-				Card::new(Rank::Six, Suit::Diamonds),
-				Card::new(Rank::Six, Suit::Clubs),
-			],
-			kicker_cards: vec![Card::new(Rank::Eight, Suit::Spades)],
+	fn pair() {
+		let no_kickers = Pair {
+			pair: ["4s".parse().unwrap(), "4h".parse().unwrap()],
+			kickers: vec![],
 		};
 
-		assert_eq!(
-			pair_jacks.to_string(),
-			"Pair of Jacks, 8 kicker".to_string()
-		);
-
-		let two_pair_jack_fives = Hand {
-			rank: HandRank::TwoPair,
-			rank_cards: vec![
-				Card::new(Rank::Jack, Suit::Diamonds),
-				Card::new(Rank::Jack, Suit::Clubs),
-				Card::new(Rank::Five, Suit::Diamonds),
-				Card::new(Rank::Five, Suit::Clubs),
-			],
-			kicker_cards: vec![Card::new(Rank::Eight, Suit::Spades)],
+		let with_kickers = Pair {
+			pair: ["6s".parse().unwrap(), "6h".parse().unwrap()],
+			kickers: vec!["Ks".parse().unwrap()],
 		};
 
+		assert_eq!(no_kickers.describe(), "Pair of Fours");
+		assert_eq!(with_kickers.describe(), "Pair of Sixes, King kicker");
+	}
+
+	#[test]
+	fn two_pair() {
+		let no_kickers = TwoPair {
+			high_pair: ["As".parse().unwrap(), "Ah".parse().unwrap()],
+			low_pair: ["Ks".parse().unwrap(), "Kh".parse().unwrap()],
+			kickers: vec![],
+		};
+
+		let with_kickers = TwoPair {
+			high_pair: ["As".parse().unwrap(), "Ah".parse().unwrap()],
+			low_pair: ["Ks".parse().unwrap(), "Kh".parse().unwrap()],
+			kickers: vec!["Qs".parse().unwrap()],
+		};
+
+		assert_eq!(no_kickers.describe(), "Two pair, Aces over Kings");
 		assert_eq!(
-			two_pair_jack_fives.to_string(),
-			"Two Pair, Jacks over 5s, 8 kicker".to_string()
+			with_kickers.describe(),
+			"Two pair, Aces over Kings, Queen kicker"
 		);
 	}
 
 	#[test]
-	fn should_describe_flush() {
-		let flush = Hand {
-			rank: HandRank::Flush,
-			rank_cards: vec![
-				Card::new(Rank::Queen, Suit::Diamonds),
-				Card::new(Rank::Jack, Suit::Diamonds),
-				Card::new(Rank::Nine, Suit::Diamonds),
-				Card::new(Rank::Eight, Suit::Diamonds),
-				Card::new(Rank::Seven, Suit::Diamonds),
+	fn three_of_a_kind() {
+		let no_kickers = ThreeOfAKind {
+			triplet: [
+				"As".parse().unwrap(),
+				"Ah".parse().unwrap(),
+				"Ad".parse().unwrap(),
 			],
-			kicker_cards: vec![],
+			kickers: vec![],
 		};
 
-		assert_eq!(flush.to_string(), "Flush, Queen high".to_string());
+		let with_kickers = ThreeOfAKind {
+			triplet: [
+				"As".parse().unwrap(),
+				"Ah".parse().unwrap(),
+				"Ad".parse().unwrap(),
+			],
+			kickers: vec!["Ks".parse().unwrap()],
+		};
+
+		assert_eq!(no_kickers.describe(), "Three of a kind, Aces");
+		assert_eq!(
+			with_kickers.describe(),
+			"Three of a kind, Aces, King kicker"
+		);
 	}
 
 	#[test]
-	fn should_describe_straights() {
-		let straight_no_ace = Hand {
-			rank: HandRank::Straight,
-			rank_cards: vec![
-				Card::new(Rank::Six, Suit::Hearts),
-				Card::new(Rank::Five, Suit::Diamonds),
-				Card::new(Rank::Four, Suit::Clubs),
-				Card::new(Rank::Three, Suit::Diamonds),
-				Card::new(Rank::Two, Suit::Spades),
+	fn straight() {
+		let straight = Straight {
+			straight: [
+				"8s".parse().unwrap(),
+				"7h".parse().unwrap(),
+				"6d".parse().unwrap(),
+				"5s".parse().unwrap(),
+				"4h".parse().unwrap(),
 			],
-			kicker_cards: vec![],
 		};
 
-		assert_eq!(straight_no_ace.to_string(), "Straight, 6 high");
+		assert_eq!(straight.describe(), "Straight, Eight high");
+	}
 
-		let straight_ace_low = Hand {
-			rank: HandRank::Straight,
-			rank_cards: vec![
-				Card::new(Rank::Five, Suit::Diamonds),
-				Card::new(Rank::Four, Suit::Clubs),
-				Card::new(Rank::Three, Suit::Diamonds),
-				Card::new(Rank::Two, Suit::Hearts),
-				Card::new(Rank::Ace, Suit::Diamonds),
+	#[test]
+	fn flush() {
+		let flush = Flush {
+			flush: [
+				"Ks".parse().unwrap(),
+				"Qs".parse().unwrap(),
+				"Js".parse().unwrap(),
+				"9s".parse().unwrap(),
+				"4s".parse().unwrap(),
 			],
-			kicker_cards: vec![],
 		};
 
-		assert_eq!(straight_ace_low.to_string(), "Straight, 5 high");
+		assert_eq!(flush.describe(), "Flush, King high");
+	}
 
-		let straight_ace_high = Hand {
-			rank: HandRank::Straight,
-			rank_cards: vec![
-				Card::new(Rank::Ace, Suit::Diamonds),
-				Card::new(Rank::King, Suit::Clubs),
-				Card::new(Rank::Queen, Suit::Hearts),
-				Card::new(Rank::Jack, Suit::Diamonds),
-				Card::new(Rank::Ten, Suit::Spades),
+	#[test]
+	fn four_of_a_kind() {
+		let no_kickers = FourOfAKind {
+			quad: [
+				"As".parse().unwrap(),
+				"Ah".parse().unwrap(),
+				"Ad".parse().unwrap(),
+				"Ac".parse().unwrap(),
 			],
-			kicker_cards: vec![],
+			kickers: vec![],
 		};
 
-		assert_eq!(straight_ace_high.to_string(), "Straight, Ace high");
-
-		let royal_flush = Hand {
-			rank: HandRank::RoyalFlush,
-			rank_cards: vec![
-				Card::new(Rank::Ace, Suit::Clubs),
-				Card::new(Rank::King, Suit::Clubs),
-				Card::new(Rank::Queen, Suit::Clubs),
-				Card::new(Rank::Jack, Suit::Clubs),
-				Card::new(Rank::Ten, Suit::Clubs),
+		let with_kickers = FourOfAKind {
+			quad: [
+				"As".parse().unwrap(),
+				"Ah".parse().unwrap(),
+				"Ad".parse().unwrap(),
+				"Ac".parse().unwrap(),
 			],
-			kicker_cards: vec![],
+			kickers: vec!["Ks".parse().unwrap()],
 		};
 
-		assert_eq!(royal_flush.to_string(), "Royal Flush");
+		assert_eq!(no_kickers.describe(), "Four of a kind, Aces");
+		assert_eq!(
+			with_kickers.describe(),
+			"Four of a kind, Aces, King kicker"
+		);
+	}
+
+	#[test]
+	fn straight_flush() {
+		let straight_flush = StraightFlush {
+			straight_flush: [
+				"8s".parse().unwrap(),
+				"7s".parse().unwrap(),
+				"6s".parse().unwrap(),
+				"5s".parse().unwrap(),
+				"4s".parse().unwrap(),
+			],
+		};
+
+		assert_eq!(straight_flush.describe(), "Straight flush, Eight high");
+	}
+
+	#[test]
+	fn royal_flush() {
+		let royal_flush = RoyalFlush {
+			royal_flush: [
+				"As".parse().unwrap(),
+				"Ks".parse().unwrap(),
+				"Qs".parse().unwrap(),
+				"Js".parse().unwrap(),
+				"Ts".parse().unwrap(),
+			],
+		};
+
+		assert_eq!(royal_flush.describe(), "Royal flush");
 	}
 }
