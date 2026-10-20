@@ -3,18 +3,11 @@
 	"min_version": "2.1.10",
 	"pre-commit": {
 		"jobs": [
-			{
-				"glob": "*.rs",
-				"run": "cargo +nightly fmt --all",
-				"stage_fixed": true
-			}
+			{ "glob": "*.rs", "run": "cargo xtask format", "stage_fixed": true }
 		]
 	},
 	"pre-push": {
 		"parallel": true,
-		"jobs": [
-			{ "run": "cargo +nightly fmt --all --check" },
-			{ "run": "cargo nextest run" }
-		]
+		"jobs": [{ "run": "cargo xtask lint" }, { "run": "cargo xtask test" }]
 	}
 }

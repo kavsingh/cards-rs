@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["cards", "poker-cards"]
+members = ["cards", "poker-cards", "xtask"]
 
 [workspace.package]
 version = "0.1.0"
