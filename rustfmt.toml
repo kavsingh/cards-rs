@@ -4,3 +4,4 @@ imports_granularity = "Module"
 max_width = 80
 reorder_imports = true
 reorder_modules = true
+use_small_heuristics = "Max"

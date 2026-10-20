@@ -34,14 +34,10 @@ fn describe_straight(cards: &[Card]) -> String {
 }
 
 fn describe_hand(hand: &Hand) -> String {
-	let first_rank = hand
-		.rank_cards
-		.first()
-		.map_or_default(|c| describe_rank(*c));
-	let first_kicker = hand
-		.kicker_cards
-		.first()
-		.map_or_default(|c| describe_rank(*c));
+	let first_rank =
+		hand.rank_cards.first().map_or_default(|c| describe_rank(*c));
+	let first_kicker =
+		hand.kicker_cards.first().map_or_default(|c| describe_rank(*c));
 
 	match hand.rank {
 		HandRank::RoyalFlush => "Royal Flush".to_string(),

@@ -71,11 +71,7 @@ fn run_format() -> Result<(), String> {
 		.status()
 		.map_err(|e| format!("Failed to spawn fmt: {e}"))?;
 
-	if status.success() {
-		Ok(())
-	} else {
-		Err("Format failed.".to_string())
-	}
+	if status.success() { Ok(()) } else { Err("Format failed.".to_string()) }
 }
 
 fn run_lint(cargo: &str) -> Result<(), String> {

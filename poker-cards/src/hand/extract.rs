@@ -10,11 +10,7 @@ fn to_hand(rank: HandRank, rank_cards: Vec<Card>, sorted: &[Card]) -> Hand {
 		.take(MAX_KICKER_CARDS.saturating_sub(rank_cards.len()))
 		.collect();
 
-	Hand {
-		rank,
-		rank_cards,
-		kicker_cards,
-	}
+	Hand { rank, rank_cards, kicker_cards }
 }
 
 type Extractor = fn(&[Card]) -> Option<Hand>;
@@ -33,10 +29,9 @@ const ORDERED_EXTRACTORS: [Extractor; 9] = [
 fn extract_royal_flush(sorted: &[Card]) -> Option<Hand> {
 	extract_straight_flush(sorted).and_then(|hand| {
 		match hand.rank_cards.first() {
-			Some(highest) if highest.rank == Rank::Ace => Some(Hand {
-				rank: HandRank::RoyalFlush,
-				..hand
-			}),
+			Some(highest) if highest.rank == Rank::Ace => {
+				Some(Hand { rank: HandRank::RoyalFlush, ..hand })
+			}
 			_ => None,
 		}
 	})
@@ -48,10 +43,8 @@ fn extract_straight_flush(sorted: &[Card]) -> Option<Hand> {
 		.find(|(_, cards)| cards.len() >= 5)
 		.map(|(_, cards)| cards)?;
 
-	extract_straight(&suit_sorted).map(|hand| Hand {
-		rank: HandRank::StraightFlush,
-		..hand
-	})
+	extract_straight(&suit_sorted)
+		.map(|hand| Hand { rank: HandRank::StraightFlush, ..hand })
 }
 
 fn extract_four_of_a_kind(sorted: &[Card]) -> Option<Hand> {
@@ -68,11 +61,7 @@ fn extract_full_house(sorted: &[Card]) -> Option<Hand> {
 
 	Some(to_hand(
 		HandRank::FullHouse,
-		three_of_a_kind
-			.rank_cards
-			.into_iter()
-			.chain(pair.rank_cards)
-			.collect(),
+		three_of_a_kind.rank_cards.into_iter().chain(pair.rank_cards).collect(),
 		sorted,
 	))
 }
@@ -115,12 +104,9 @@ fn extract_straight(sorted: &[Card]) -> Option<Hand> {
 }
 
 fn extract_three_of_a_kind(sorted: &[Card]) -> Option<Hand> {
-	group_by(sorted, |c| c.rank)
-		.iter()
-		.find(|(_, cards)| cards.len() == 3)
-		.map(|(_, cards)| {
-			to_hand(HandRank::ThreeOfAKind, cards.clone(), sorted)
-		})
+	group_by(sorted, |c| c.rank).iter().find(|(_, cards)| cards.len() == 3).map(
+		|(_, cards)| to_hand(HandRank::ThreeOfAKind, cards.clone(), sorted),
+	)
 }
 
 fn extract_two_pair(sorted: &[Card]) -> Option<Hand> {
@@ -145,16 +131,15 @@ fn extract_two_pair(sorted: &[Card]) -> Option<Hand> {
 }
 
 fn extract_pair(sorted: &[Card]) -> Option<Hand> {
-	group_by(sorted, |c| c.rank)
-		.iter()
-		.find(|(_, cards)| cards.len() >= 2)
-		.map(|(_, cards)| {
+	group_by(sorted, |c| c.rank).iter().find(|(_, cards)| cards.len() >= 2).map(
+		|(_, cards)| {
 			to_hand(
 				HandRank::Pair,
 				cards.iter().copied().take(2).collect(),
 				sorted,
 			)
-		})
+		},
+	)
 }
 
 impl From<HandCandidate<'_>> for Hand {
@@ -165,9 +150,8 @@ impl From<HandCandidate<'_>> for Hand {
 		sorted.append(&mut community);
 		sorted.sort_by(|a, b| b.cmp(a));
 
-		if let Some(hand) = ORDERED_EXTRACTORS
-			.iter()
-			.find_map(|extractor| extractor(&sorted))
+		if let Some(hand) =
+			ORDERED_EXTRACTORS.iter().find_map(|extractor| extractor(&sorted))
 		{
 			return hand;
 		}
