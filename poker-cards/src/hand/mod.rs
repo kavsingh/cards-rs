@@ -1,28 +1,15 @@
+mod candidate;
 mod compare;
 mod describe;
 mod extract;
 
+use std::str::FromStr;
+
+pub use candidate::HandCandidate;
 pub use compare::RankedHand;
 pub use describe::Describe;
 
 use crate::Card;
-
-pub struct HandCandidate {
-	sorted_cards: Vec<Card>,
-}
-
-impl HandCandidate {
-	#[must_use]
-	pub fn new(pocket_cards: &[Card; 2], community_cards: &[Card]) -> Self {
-		let mut sorted_cards = pocket_cards.to_vec();
-		let mut community = community_cards.to_owned();
-
-		sorted_cards.append(&mut community);
-		sorted_cards.sort_by(|a, b| b.cmp(a));
-
-		Self { sorted_cards }
-	}
-}
 
 #[non_exhaustive]
 #[derive(Debug)]
@@ -103,4 +90,28 @@ pub enum Hand {
 	FourOfAKind(FourOfAKind),
 	StraightFlush(StraightFlush),
 	RoyalFlush(RoyalFlush),
+}
+
+impl FromStr for Hand {
+	type Err = &'static str;
+
+	fn from_str(value: &'_ str) -> Result<Self, Self::Err> {
+		let candidate = value.parse::<HandCandidate>()?;
+
+		Self::try_from(&candidate).map_err(|_| "invalid")
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn from_str() {
+		match "Ts As Qs Ks Js".parse::<Hand>() {
+			#[allow(clippy::assertions_on_constants)]
+			Ok(_) => assert!(true),
+			_ => panic!("Failed to create hand"),
+		}
+	}
 }
