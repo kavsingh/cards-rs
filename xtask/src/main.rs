@@ -16,14 +16,14 @@ fn main() -> ExitCode {
 		.format_timestamp(None)
 		.init();
 
-	let Some(subcommand) = env::args()
-		.collect::<Vec<_>>()
-		.get(1)
-		.and_then(|s| Subcommand::from_str(s).ok())
-	else {
-		log::error!("Expected a subcommand");
-		return ExitCode::FAILURE;
-	};
+	let subcommand =
+		match Subcommand::try_from(env::args().collect::<Vec<_>>().get(1)) {
+			Ok(cmd) => cmd,
+			Err(e) => {
+				log::error!("{e}");
+				return ExitCode::FAILURE;
+			}
+		};
 
 	let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
 	let result = match subcommand {
@@ -51,10 +51,16 @@ impl FromStr for Subcommand {
 			"lint" => Ok(Self::Lint),
 			"test" => Ok(Self::Test),
 			"mutants" => Ok(Self::Mutants),
-			_ => Err(
-				"Unknown command. Expected 'format' | 'lint' | 'test' | 'mutants'.",
-			),
+			_ => Err("Expected 'format' | 'lint' | 'test' | 'mutants'."),
 		}
+	}
+}
+
+impl TryFrom<Option<&String>> for Subcommand {
+	type Error = &'static str;
+
+	fn try_from(value: Option<&String>) -> Result<Self, Self::Error> {
+		value.map_or(Err("Expected a subcommand"), |s| s.parse())
 	}
 }
 
@@ -121,9 +127,7 @@ fn run_tests(cargo: &str) -> Result<(), String> {
 
 fn run_mutants(cargo: &str) -> Result<(), String> {
 	let status = Command::new(cargo)
-		.arg("mutants")
-		.arg("--in-place")
-		.arg("--test-tool=nextest")
+		.args(["mutants", "--in-place", "--test-tool=nextest"])
 		.status()
 		.map_err(|e| format!("Failed to spawn cargo mutants: {e}"))?;
 
