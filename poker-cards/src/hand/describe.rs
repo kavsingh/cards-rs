@@ -156,152 +156,61 @@ impl Describe for Hand {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 mod tests {
 	use super::*;
 
+	fn describe(s: &str) -> String {
+		s.parse::<Hand>().unwrap().describe()
+	}
+
 	#[test]
 	fn high_card() {
-		let no_kickers = Hand::HighCard(HighCard {
-			high_card: "As".parse().unwrap(),
-			kickers: vec![],
-		});
-
-		let with_kickers = Hand::HighCard(HighCard {
-			high_card: "As".parse().unwrap(),
-			kickers: vec![
-				"8s".parse().unwrap(),
-				"4d".parse().unwrap(),
-				"2h".parse().unwrap(),
-			],
-		});
-
-		assert_eq!(no_kickers.describe(), "High card, Ace");
 		assert_eq!(
-			with_kickers.describe(),
+			describe("4d As 8s 2h"),
 			"High card, Ace, Eight Four Two kickers"
 		);
 	}
 
 	#[test]
 	fn pair() {
-		let no_kickers = Pair {
-			pair: ["4s".parse().unwrap(), "4h".parse().unwrap()],
-			kickers: vec![],
-		};
-
-		let with_kickers = Pair {
-			pair: ["6s".parse().unwrap(), "6h".parse().unwrap()],
-			kickers: vec!["Ks".parse().unwrap()],
-		};
-
-		assert_eq!(no_kickers.describe(), "Pair of Fours");
-		assert_eq!(with_kickers.describe(), "Pair of Sixes, King kicker");
+		assert_eq!(describe("4s 4h"), "Pair of Fours");
+		assert_eq!(describe("6s 6h Ks"), "Pair of Sixes, King kicker");
 	}
 
 	#[test]
 	fn two_pair() {
-		let no_kickers = TwoPair {
-			high_pair: ["As".parse().unwrap(), "Ah".parse().unwrap()],
-			low_pair: ["Ks".parse().unwrap(), "Kh".parse().unwrap()],
-			kickers: vec![],
-		};
-
-		let with_kickers = TwoPair {
-			high_pair: ["As".parse().unwrap(), "Ah".parse().unwrap()],
-			low_pair: ["Ks".parse().unwrap(), "Kh".parse().unwrap()],
-			kickers: vec!["Qs".parse().unwrap()],
-		};
-
-		assert_eq!(no_kickers.describe(), "Two pair, Aces over Kings");
+		assert_eq!(describe("As Ah Ks Kh"), "Two pair, Aces over Kings");
 		assert_eq!(
-			with_kickers.describe(),
+			describe("As Ah Ks Kh Qs"),
 			"Two pair, Aces over Kings, Queen kicker"
 		);
 	}
 
 	#[test]
 	fn three_of_a_kind() {
-		let no_kickers = ThreeOfAKind {
-			triplet: [
-				"As".parse().unwrap(),
-				"Ah".parse().unwrap(),
-				"Ad".parse().unwrap(),
-			],
-			kickers: vec![],
-		};
-
-		let with_kickers = ThreeOfAKind {
-			triplet: [
-				"As".parse().unwrap(),
-				"Ah".parse().unwrap(),
-				"Ad".parse().unwrap(),
-			],
-			kickers: vec!["Ks".parse().unwrap()],
-		};
-
-		assert_eq!(no_kickers.describe(), "Three of a kind, Aces");
+		assert_eq!(describe("As Ah Ad"), "Three of a kind, Aces");
 		assert_eq!(
-			with_kickers.describe(),
+			describe("As Ah Ad Ks"),
 			"Three of a kind, Aces, King kicker"
 		);
 	}
 
 	#[test]
 	fn straight() {
-		let straight = Straight {
-			straight: [
-				"8s".parse().unwrap(),
-				"7h".parse().unwrap(),
-				"6d".parse().unwrap(),
-				"5s".parse().unwrap(),
-				"4h".parse().unwrap(),
-			],
-		};
-
-		assert_eq!(straight.describe(), "Straight, Eight high");
+		assert_eq!(describe("8s 7h 6d 5s 4h"), "Straight, Eight high");
 	}
 
 	#[test]
 	fn flush() {
-		let flush = Flush {
-			flush: [
-				"Ks".parse().unwrap(),
-				"Qs".parse().unwrap(),
-				"Js".parse().unwrap(),
-				"9s".parse().unwrap(),
-				"4s".parse().unwrap(),
-			],
-		};
-
-		assert_eq!(flush.describe(), "Flush, King high");
+		assert_eq!(describe("Js Ks Qs 9s 4s"), "Flush, King high");
 	}
 
 	#[test]
 	fn four_of_a_kind() {
-		let no_kickers = FourOfAKind {
-			quad: [
-				"As".parse().unwrap(),
-				"Ah".parse().unwrap(),
-				"Ad".parse().unwrap(),
-				"Ac".parse().unwrap(),
-			],
-			kickers: vec![],
-		};
+		assert_eq!(describe("As Ah Ad Ac"), "Four of a kind, Aces");
 
-		let with_kickers = FourOfAKind {
-			quad: [
-				"As".parse().unwrap(),
-				"Ah".parse().unwrap(),
-				"Ad".parse().unwrap(),
-				"Ac".parse().unwrap(),
-			],
-			kickers: vec!["Ks".parse().unwrap()],
-		};
-
-		assert_eq!(no_kickers.describe(), "Four of a kind, Aces");
 		assert_eq!(
-			with_kickers.describe(),
+			describe("As Ah Ad Ac Ks"),
 			"Four of a kind, Aces, King kicker"
 		);
 	}

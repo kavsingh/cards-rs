@@ -150,7 +150,6 @@ impl Eq for Hand {}
 //
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::panic)]
 mod tests {
 	use super::*;
 
