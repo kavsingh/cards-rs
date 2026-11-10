@@ -1,0 +1,62 @@
+name: Setup
+description: Setup and install dependencies
+
+outputs:
+    actions-cache-url:
+        description: GitHub Actions cache URL
+        value: ${{ steps.export-env.outputs.actions-cache-url }}
+    actions-results-url:
+        description: GitHub Actions results URL
+        value: ${{ steps.export-env.outputs.actions-results-url }}
+    actions-runtime-token:
+        description: GitHub Actions runtime token
+        value: ${{ steps.export-env.outputs.actions-runtime-token }}
+    actions-cache-service-v2:
+        description: GitHub Actions cache service v2
+        value: ${{ steps.export-env.outputs.actions-cache-service-v2 }}
+
+runs:
+    using: composite
+    steps:
+        - name: Install Rust and tools
+          uses: taiki-e/install-action@v2
+          with:
+              tool: |
+                  rust@nightly+rustfmt+clippy
+                  sccache
+                  nextest
+                  cargo-mutants
+                  cargo-llvm-cov
+
+        - name: Export GitHub Actions env variables
+          id: export-env
+          uses: actions/github-script@v9
+          with:
+              script: |
+                  for (const key of [
+                      'ACTIONS_CACHE_URL',
+                      'ACTIONS_RESULTS_URL',
+                      'ACTIONS_RUNTIME_TOKEN',
+                      'ACTIONS_CACHE_SERVICE_V2',
+                  ]) {
+                      if (process.env[key]) {
+                          if (key === 'ACTIONS_RUNTIME_TOKEN') {
+                              core.setSecret(process.env[key]);
+                          }
+                          core.exportVariable(key, process.env[key]);
+                          core.setOutput(key.toLowerCase().replaceAll('_', '-'), process.env[key]);
+                      }
+                  }
+
+        - name: Set Rust environment variables
+          shell: bash
+          run: |
+              echo "CARGO_INCREMENTAL=0" >> "$GITHUB_ENV"
+              echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
+              echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+
+        - name: Cache crates
+          uses: Swatinem/rust-cache@v2
+          with:
+              cache-targets: false
+              cache-on-failure: true

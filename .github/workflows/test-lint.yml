@@ -8,68 +8,58 @@ on:
 permissions:
     contents: read
 
-env:
-    CARGO_INCREMENTAL: "0"
-    RUSTC_WRAPPER: sccache
-    SCCACHE_GHA_ENABLED: "true"
-
 jobs:
-    test-lint:
-        name: Test and lint
+    lint:
+        name: Lint
         runs-on: ubuntu-latest
 
         steps:
-            - name: checkout
+            - name: Checkout
               uses: actions/checkout@v7
 
-            - name: install rust and tools
-              uses: taiki-e/install-action@v2
-              with:
-                  tool: |
-                      rust@nightly+rustfmt+clippy
-                      sccache
-                      nextest
-                      cargo-mutants
-                      cargo-llvm-cov
+            - name: Setup
+              uses: ./.github/actions/setup
 
-            - name: cache crates
-              uses: Swatinem/rust-cache@v2
-              with:
-                  cache-targets: false
-                  cache-on-failure: true
-
-            - name: export github actions env variables
-              uses: actions/github-script@v9
-              with:
-                  script: |
-                      for (const key of [
-                          'ACTIONS_CACHE_URL',
-                          'ACTIONS_RESULTS_URL',
-                          'ACTIONS_RUNTIME_TOKEN',
-                          'ACTIONS_CACHE_SERVICE_V2',
-                      ]) {
-                          if (process.env[key]) {
-                              core.exportVariable(key, process.env[key]);
-                          }
-                      }
-
-            - name: lint
-              env:
-                  RUSTFLAGS: "-Dwarnings"
+            - name: Lint
               run: cargo xtask lint
+              env: { RUSTFLAGS: "-Dwarnings" }
 
-            - name: test
+            - name: Summary
+              if: always()
+              uses: ./.github/actions/summary
+
+    test:
+        name: Test
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v7
+
+            - name: Setup
+              uses: ./.github/actions/setup
+
+            - name: Test
               run: cargo xtask test
 
-            - name: mutation test
+            - name: Summary
+              if: always()
+              uses: ./.github/actions/summary
+
+    mutation-test:
+        name: Mutation test
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v7
+
+            - name: Setup
+              uses: ./.github/actions/setup
+
+            - name: Mutation test
               run: cargo xtask mutants
 
-            - name: print cache stats
+            - name: Summary
               if: always()
-              run: |
-                  {
-                  echo "### sccache Stats"
-                  echo '```text'
-                  sccache --show-stats
-                  echo '```'
-                  } >> "$GITHUB_STEP_SUMMARY"
+              uses: ./.github/actions/summary

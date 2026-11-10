@@ -1,0 +1,15 @@
+name: Summary
+description: Print job summary stats and info
+
+runs:
+    using: composite
+    steps:
+        - name: Print sccache stats
+          shell: bash
+          run: |
+              {
+              echo "### sccache Stats"
+              echo '```text'
+              sccache --show-stats
+              echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
