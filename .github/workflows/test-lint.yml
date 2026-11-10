@@ -14,34 +14,52 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            - uses: actions/checkout@v7
-            - uses: ./.github/actions/setup
-              id: setup
-            - run: cargo xtask lint
+            - name: Checkout
+              uses: actions/checkout@v7
+
+            - name: Setup
+              uses: ./.github/actions/setup
+
+            - name: Lint
+              run: cargo xtask lint
               env: { RUSTFLAGS: "-Dwarnings" }
-            - if: steps.setup.outcome == 'success'
-              uses: ./.github/actions/sccache-summary
+
+            - name: Summary
+              if: always()
+              uses: ./.github/actions/summary
 
     test:
         name: Test
         runs-on: ubuntu-latest
 
         steps:
-            - uses: actions/checkout@v7
-            - uses: ./.github/actions/setup
-              id: setup
-            - run: cargo xtask test
-            - if: steps.setup.outcome == 'success'
-              uses: ./.github/actions/sccache-summary
+            - name: Checkout
+              uses: actions/checkout@v7
+
+            - name: Setup
+              uses: ./.github/actions/setup
+
+            - name: Test
+              run: cargo xtask test
+
+            - name: Summary
+              if: always()
+              uses: ./.github/actions/summary
 
     mutation-test:
         name: Mutation test
         runs-on: ubuntu-latest
 
         steps:
-            - uses: actions/checkout@v7
-            - uses: ./.github/actions/setup
-              id: setup
-            - run: cargo xtask mutants
-            - if: steps.setup.outcome == 'success'
-              uses: ./.github/actions/sccache-summary
+            - name: Checkout
+              uses: actions/checkout@v7
+
+            - name: Setup
+              uses: ./.github/actions/setup
+
+            - name: Mutation test
+              run: cargo xtask mutants
+
+            - name: Summary
+              if: always()
+              uses: ./.github/actions/summary

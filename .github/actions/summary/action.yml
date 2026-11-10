@@ -1,5 +1,5 @@
-name: sccache summary
-description: Add sccache stats to the job summary
+name: Summary
+description: Print job summary stats and info
 
 runs:
     using: composite
