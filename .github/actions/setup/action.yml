@@ -18,13 +18,6 @@ outputs:
 runs:
     using: composite
     steps:
-        - name: Set Rust environment variables
-          shell: bash
-          run: |
-              echo "CARGO_INCREMENTAL=0" >> $GITHUB_ENV
-              echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-              echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-
         - name: Install Rust and tools
           uses: taiki-e/install-action@v2
           with:
@@ -35,18 +28,11 @@ runs:
                   cargo-mutants
                   cargo-llvm-cov
 
-        - name: Cache crates
-          uses: Swatinem/rust-cache@v2
-          with:
-              cache-targets: false
-              cache-on-failure: true
-
         - name: Export GitHub Actions env variables
           id: export-env
           uses: actions/github-script@v9
           with:
               script: |
-                  const outputs = {};
                   for (const key of [
                       'ACTIONS_CACHE_URL',
                       'ACTIONS_RESULTS_URL',
@@ -54,22 +40,23 @@ runs:
                       'ACTIONS_CACHE_SERVICE_V2',
                   ]) {
                       if (process.env[key]) {
+                          if (key === 'ACTIONS_RUNTIME_TOKEN') {
+                              core.setSecret(process.env[key]);
+                          }
                           core.exportVariable(key, process.env[key]);
-                          outputs[key.toLowerCase()] = process.env[key];
+                          core.setOutput(key.toLowerCase().replaceAll('_', '-'), process.env[key]);
                       }
                   }
-                  Object.entries(outputs).forEach(([key, value]) => {
-                      core.setOutput(key, value);
-                  });
 
-    post:
-        - name: Print sccache stats
-          if: always()
+        - name: Set Rust environment variables
           shell: bash
           run: |
-              {
-              echo "### sccache Stats"
-              echo '```text'
-              sccache --show-stats
-              echo '```'
-              } >> "$GITHUB_STEP_SUMMARY"
+              echo "CARGO_INCREMENTAL=0" >> "$GITHUB_ENV"
+              echo "RUSTC_WRAPPER=sccache" >> "$GITHUB_ENV"
+              echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+
+        - name: Cache crates
+          uses: Swatinem/rust-cache@v2
+          with:
+              cache-targets: false
+              cache-on-failure: true

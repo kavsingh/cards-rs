@@ -16,8 +16,11 @@ jobs:
         steps:
             - uses: actions/checkout@v7
             - uses: ./.github/actions/setup
+              id: setup
             - run: cargo xtask lint
               env: { RUSTFLAGS: "-Dwarnings" }
+            - if: steps.setup.outcome == 'success'
+              uses: ./.github/actions/sccache-summary
 
     test:
         name: Test
@@ -26,7 +29,10 @@ jobs:
         steps:
             - uses: actions/checkout@v7
             - uses: ./.github/actions/setup
+              id: setup
             - run: cargo xtask test
+            - if: steps.setup.outcome == 'success'
+              uses: ./.github/actions/sccache-summary
 
     mutation-test:
         name: Mutation test
@@ -35,4 +41,7 @@ jobs:
         steps:
             - uses: actions/checkout@v7
             - uses: ./.github/actions/setup
+              id: setup
             - run: cargo xtask mutants
+            - if: steps.setup.outcome == 'success'
+              uses: ./.github/actions/sccache-summary
