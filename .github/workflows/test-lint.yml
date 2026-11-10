@@ -32,6 +32,12 @@ jobs:
                       cargo-mutants
                       cargo-llvm-cov
 
+            - name: cache crates
+              uses: Swatinem/rust-cache@v2
+              with:
+                  cache-targets: false
+                  cache-on-failure: true
+
             - name: export github actions env variables
               uses: actions/github-script@v9
               with:
@@ -48,7 +54,8 @@ jobs:
                       }
 
             - name: lint
-              env: { RUSTFLAGS: "-Dwarnings" }
+              env:
+                  RUSTFLAGS: "-Dwarnings"
               run: cargo xtask lint
 
             - name: test
