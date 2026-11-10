@@ -55,7 +55,7 @@ impl Ord for Straight {
 
 impl Ord for Flush {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-		cmp_max(&self.flush, &other.flush)
+		self.flush.cmp(&other.flush)
 	}
 }
 
@@ -181,6 +181,25 @@ mod tests {
 			("As Ah Kc Kh Qd", "Ac Ad Ks Kd Jc", Ordering::Greater),
 			("As Ah Ad Kc Qd", "Ac As Ah Kh Js", Ordering::Greater),
 			("As Ah Ac Ad Ks", "As Ah Ac Ad Qs", Ordering::Greater),
+		];
+
+		for (a, b, expected) in cases {
+			let a_hand: Hand = a.parse().unwrap();
+			let b_hand: Hand = b.parse().unwrap();
+			assert_eq!(a_hand.cmp(&b_hand), expected, "{a} vs {b}");
+		}
+	}
+
+	#[test]
+	fn flushes() {
+		use std::cmp::Ordering;
+
+		let cases = [
+			("5h 6d As Ks Qs 9s 3s", "7c 8h As Ks Qs 9s 3s", Ordering::Equal),
+			("Qs 6s As 9s 2s Kd 3c", "Js 5s As 9s 2s Kd 3c", Ordering::Greater),
+			("Js 3d As Ks 9s 4s 2c", "Qs 3h As Ks 9s 4s 2c", Ordering::Less),
+			("Js 3d As Ks Qs 4s 2c", "Ts 3h As Ks Qs 4s 2c", Ordering::Greater),
+			("9s 3d As Ks Qs Js 2c", "8s 3h As Ks Qs Js 2c", Ordering::Greater),
 		];
 
 		for (a, b, expected) in cases {
