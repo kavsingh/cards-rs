@@ -7,7 +7,8 @@
 		"TOML": {
 			"language_servers": ["tombi"],
 			"formatter": { "language_server": { "name": "tombi" } }
-		}
+		},
+		"YAML": { "formatter": "prettier" }
 	},
 	"lsp": {
 		"rust-analyzer": {

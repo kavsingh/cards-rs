@@ -8,68 +8,31 @@ on:
 permissions:
     contents: read
 
-env:
-    CARGO_INCREMENTAL: "0"
-    RUSTC_WRAPPER: sccache
-    SCCACHE_GHA_ENABLED: "true"
-
 jobs:
-    test-lint:
-        name: Test and lint
+    lint:
+        name: Lint
         runs-on: ubuntu-latest
 
         steps:
-            - name: checkout
-              uses: actions/checkout@v7
+            - uses: actions/checkout@v7
+            - uses: ./.github/actions/setup
+            - run: cargo xtask lint
+              env: { RUSTFLAGS: "-Dwarnings" }
 
-            - name: install rust and tools
-              uses: taiki-e/install-action@v2
-              with:
-                  tool: |
-                      rust@nightly+rustfmt+clippy
-                      sccache
-                      nextest
-                      cargo-mutants
-                      cargo-llvm-cov
+    test:
+        name: Test
+        runs-on: ubuntu-latest
 
-            - name: cache crates
-              uses: Swatinem/rust-cache@v2
-              with:
-                  cache-targets: false
-                  cache-on-failure: true
+        steps:
+            - uses: actions/checkout@v7
+            - uses: ./.github/actions/setup
+            - run: cargo xtask test
 
-            - name: export github actions env variables
-              uses: actions/github-script@v9
-              with:
-                  script: |
-                      for (const key of [
-                          'ACTIONS_CACHE_URL',
-                          'ACTIONS_RESULTS_URL',
-                          'ACTIONS_RUNTIME_TOKEN',
-                          'ACTIONS_CACHE_SERVICE_V2',
-                      ]) {
-                          if (process.env[key]) {
-                              core.exportVariable(key, process.env[key]);
-                          }
-                      }
+    mutation-test:
+        name: Mutation test
+        runs-on: ubuntu-latest
 
-            - name: lint
-              env:
-                  RUSTFLAGS: "-Dwarnings"
-              run: cargo xtask lint
-
-            - name: test
-              run: cargo xtask test
-
-            - name: mutation test
-              run: cargo xtask mutants
-
-            - name: print cache stats
-              if: always()
-              run: |
-                  {
-                  echo "### sccache Stats"
-                  echo '```text'
-                  sccache --show-stats
-                  echo '```'
-                  } >> "$GITHUB_STEP_SUMMARY"
+        steps:
+            - uses: actions/checkout@v7
+            - uses: ./.github/actions/setup
+            - run: cargo xtask mutants

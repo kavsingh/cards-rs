@@ -2,6 +2,10 @@
 	"$schema": "https://json.schemastore.org/prettierrc",
 	"useTabs": true,
 	"overrides": [
-		{ "files": ["*.{json,jsonc}"], "options": { "trailingComma": "none" } }
+		{ "files": ["*.{json,jsonc}"], "options": { "trailingComma": "none" } },
+		{
+			"files": ["*.{yml,yaml}"],
+			"options": { "useTabs": false, "tabWidth": 4 }
+		}
 	]
 }
