@@ -5,6 +5,10 @@ use super::{
 use crate::util::cmp_max;
 use crate::{Card, Rank, derive_total_ord};
 
+fn cmp_kickers(a: &[Card], b: &[Card]) -> std::cmp::Ordering {
+	a.cmp(b)
+}
+
 fn cmp_straight(a: &[Card; 5], b: &[Card; 5]) -> std::cmp::Ordering {
 	match (a[4].rank == Rank::Ace, b[4].rank == Rank::Ace) {
 		(true, false) => std::cmp::Ordering::Less,
@@ -17,14 +21,14 @@ impl Ord for HighCard {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
 		self.high_card
 			.cmp(&other.high_card)
-			.then_with(|| cmp_max(&self.kickers, &other.kickers))
+			.then_with(|| cmp_kickers(&self.kickers, &other.kickers))
 	}
 }
 
 impl Ord for Pair {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
 		cmp_max(&self.pair, &other.pair)
-			.then_with(|| cmp_max(&self.kickers, &other.kickers))
+			.then_with(|| cmp_kickers(&self.kickers, &other.kickers))
 	}
 }
 
@@ -32,14 +36,14 @@ impl Ord for TwoPair {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
 		cmp_max(&self.high_pair, &other.high_pair)
 			.then_with(|| cmp_max(&self.low_pair, &other.low_pair))
-			.then_with(|| cmp_max(&self.kickers, &other.kickers))
+			.then_with(|| cmp_kickers(&self.kickers, &other.kickers))
 	}
 }
 
 impl Ord for ThreeOfAKind {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
 		cmp_max(&self.triplet, &other.triplet)
-			.then_with(|| cmp_max(&self.kickers, &other.kickers))
+			.then_with(|| cmp_kickers(&self.kickers, &other.kickers))
 	}
 }
 
@@ -65,7 +69,7 @@ impl Ord for FullHouse {
 impl Ord for FourOfAKind {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
 		cmp_max(&self.quad, &other.quad)
-			.then_with(|| cmp_max(&self.kickers, &other.kickers))
+			.then_with(|| cmp_kickers(&self.kickers, &other.kickers))
 	}
 }
 
@@ -155,6 +159,35 @@ mod tests {
 
 	fn c(s: &str) -> Card {
 		s.parse().unwrap()
+	}
+
+	#[test]
+	fn kickers() {
+		use std::cmp::Ordering;
+
+		let cases = [
+			// Compare the highest kicker first, not the lowest.
+			("As Ah Kc Qd 2s", "Ac Ad Jh Tc 9s", Ordering::Greater),
+			// Matching highest and lowest kickers still leave the middle.
+			("As Ah Kc Qd 2s", "Ac Ad Kh Jc 2d", Ordering::Greater),
+			("As Ah Kc Qd Jc", "Ac Ad Kh Qs Td", Ordering::Greater),
+			("As Ah Kc Qd Jc", "Ac Ad Kh Qs Jd", Ordering::Equal),
+			// A longer matching prefix wins for incomplete hands.
+			("As Ah Kc Qd", "Ac Ad Kh", Ordering::Greater),
+			("As Ah Kc", "Ac Ad Kh Qs", Ordering::Less),
+			("As Ah", "Ac Ad Kh", Ordering::Less),
+			("As Ah Kc", "Ac Ad Qs Jd", Ordering::Greater),
+			("As Kc Qd Jc 2s", "Ah Kh Qs Td 2d", Ordering::Greater),
+			("As Ah Kc Kh Qd", "Ac Ad Ks Kd Jc", Ordering::Greater),
+			("As Ah Ad Kc Qd", "Ac As Ah Kh Js", Ordering::Greater),
+			("As Ah Ac Ad Ks", "As Ah Ac Ad Qs", Ordering::Greater),
+		];
+
+		for (a, b, expected) in cases {
+			let a_hand: Hand = a.parse().unwrap();
+			let b_hand: Hand = b.parse().unwrap();
+			assert_eq!(a_hand.cmp(&b_hand), expected, "{a} vs {b}");
+		}
 	}
 
 	#[test]
