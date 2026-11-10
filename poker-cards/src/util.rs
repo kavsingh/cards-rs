@@ -25,6 +25,15 @@ pub fn group_by<TItem: Copy, TKey: PartialEq>(
 	groups
 }
 
+pub fn largest_group_by<TItem: Copy, TKey: PartialEq>(
+	items: &[TItem],
+	key_fn: impl Fn(&TItem) -> TKey,
+) -> Option<(TKey, Vec<TItem>)> {
+	group_by(items, key_fn)
+		.into_iter()
+		.max_by(|(_, a), (_, b)| a.len().cmp(&b.len()))
+}
+
 pub fn chunk_by<TItem: Copy>(
 	items: &[TItem],
 	predicate_fn: impl Fn(&TItem, &TItem) -> bool,

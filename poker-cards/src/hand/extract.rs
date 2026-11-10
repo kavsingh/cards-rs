@@ -4,7 +4,7 @@ use super::{
 	Flush, FourOfAKind, FullHouse, Hand, HandCandidate, HighCard, Pair,
 	RoyalFlush, Straight, StraightFlush, ThreeOfAKind, TwoPair,
 };
-use crate::util::{chunk_by, get_n_by, group_by, without};
+use crate::util::{chunk_by, get_n_by, group_by, largest_group_by, without};
 use crate::{Card, Rank};
 
 #[derive(Debug, Error, PartialEq, Eq, Copy, Clone)]
@@ -200,10 +200,14 @@ impl TryFrom<&HandCandidate> for StraightFlush {
 	type Error = ExtractError;
 
 	fn try_from(candidate: &HandCandidate) -> Result<Self, Self::Error> {
-		let straight_flush =
-			get_n_by::<_, _, 5>(&candidate.sorted_cards, |c| c.suit)
-				.and_then(|cs| try_straight_from(&cs).ok())
-				.ok_or(ExtractError::NoStraightFlush)?;
+		let Some((_, suited)) =
+			largest_group_by(&candidate.sorted_cards, |c| c.suit)
+		else {
+			return Err(ExtractError::NoStraightFlush);
+		};
+
+		let straight_flush = try_straight_from(&suited)
+			.map_err(|_| ExtractError::NoStraightFlush)?;
 
 		Ok(Self { straight_flush })
 	}
@@ -609,6 +613,28 @@ mod tests {
 			assert_eq!(&hand.straight_flush[4].to_string(), "As");
 		} else {
 			panic!("Expected StraightFlush hand");
+		}
+	}
+
+	#[test]
+	fn straight_flush_with_extra_suited_cards() {
+		let cases = [
+			("As 9s 8s 7s 6s 5s 2d", ["9s", "8s", "7s", "6s", "5s"]),
+			("As 9s 5s 4s 3s 2s Kd", ["5s", "4s", "3s", "2s", "As"]),
+			("As Ks 9s 8s 7s 6s 5s", ["9s", "8s", "7s", "6s", "5s"]),
+			("As 6s 5s 4s 3s 2s Kd", ["6s", "5s", "4s", "3s", "2s"]),
+			("9s 8s 7s 6s 5s 4s 2d", ["9s", "8s", "7s", "6s", "5s"]),
+		];
+
+		for (input, expected) in cases {
+			let hand: Hand = input.parse().unwrap();
+			if let Hand::StraightFlush(hand) = hand {
+				let expected =
+					expected.map(|card| card.parse::<Card>().unwrap());
+				assert_eq!(hand.straight_flush, expected, "{input}");
+			} else {
+				panic!("Expected straight flush for {input}, got {hand:?}");
+			}
 		}
 	}
 
