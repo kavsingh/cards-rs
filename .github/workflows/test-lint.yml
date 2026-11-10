@@ -36,8 +36,16 @@ jobs:
               uses: actions/github-script@v9
               with:
                   script: |
-                      core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
-                      core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+                      for (const key of [
+                          'ACTIONS_CACHE_URL',
+                          'ACTIONS_RESULTS_URL',
+                          'ACTIONS_RUNTIME_TOKEN',
+                          'ACTIONS_CACHE_SERVICE_V2',
+                      ]) {
+                          if (process.env[key]) {
+                              core.exportVariable(key, process.env[key]);
+                          }
+                      }
 
             - name: lint
               env: { RUSTFLAGS: "-Dwarnings" }
