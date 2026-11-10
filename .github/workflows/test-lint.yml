@@ -11,15 +11,30 @@ jobs:
         runs-on: ubuntu-latest
         env:
             RUSTFLAGS: "-Dwarnings"
+            RUSTC_WRAPPER: sccache
+            SCCACHE_GHA_ENABLED: "true"
         steps:
             - uses: actions/checkout@v7
             - uses: taiki-e/install-action@v2
               with:
                   tool: |
                       rust@nightly+rustfmt+clippy
+                      sccache
                       nextest
                       cargo-mutants
                       cargo-llvm-cov
+            - uses: actions/github-script@v9
+              with:
+                  script: |
+                      core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+                      core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
             - run: cargo xtask lint
             - run: cargo xtask test
             - run: cargo xtask mutants
+            - run: |
+                  {
+                  echo "### sccache Stats"
+                  echo '```text'
+                  sccache --show-stats
+                  echo '```'
+                  } >> "$GITHUB_STEP_SUMMARY"
